@@ -1022,11 +1022,14 @@ function frame(now) {
     ? (anim ? "zooming \u00b7 " : "zoom took ") + lastZoomSecs.toFixed(1) + " s"
     : Math.abs(zoom - 1) < 0.005 ? "true model size" : zoom < 1 ? "zoomed out" : "magnification");
   const screenIn = stageW / ppi;
+  // the model's scale is named in this line, so it's always visible which size of model is on screen
+  const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
+  const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft", yd: "yd", mi: "mile" }[scaleUnit] + "</b> model";   // "500 ft model", "2 mile model"
   setText(equiv, "eq", Math.abs(zoom - 1) < 0.005
-    ? "Your screen shows <b>" + fmtLen(screenIn) + "</b> of the model across."
+    ? "Your screen shows <b>" + fmtLen(screenIn) + "</b> of " + model + " across."
     : zoom < 1
-      ? "Your screen now shows <b>" + fmtLen(screenIn / zoom) + "</b> of the model across."
-      : "Like a phone <b>" + fmtLen(screenIn * zoom) + "</b> wide, showing <b>" + fmtLen(screenIn / zoom) + "</b> of model");
+      ? "Your screen now shows <b>" + fmtLen(screenIn / zoom) + "</b> of " + model + " across."
+      : "Like a phone <b>" + fmtLen(screenIn * zoom) + "</b> wide, showing <b>" + fmtLen(screenIn / zoom) + "</b> of " + model);
   const dCss = mainDiamCss(), dPx = dCss * dpr;
   const lit = dPx >= 1;
   setText(sScreen, "ss", fmtLen(dCss / ppi));
