@@ -117,12 +117,10 @@ h1 { margin: 0; min-width: 0; }
 .stat .k { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .stat .v { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; margin-top: 2px; }
 .stat .v small { color: var(--muted); font-size: 11.5px; }
-.stat.live .v { color: var(--sun); }
 .kpick { position: relative; display: inline-block; }
 .kref { color: var(--sun); padding-right: 11px; border-bottom: 1px dotted var(--sun-dim); background: linear-gradient(45deg, transparent 50%, var(--sun) 50%) right 3px top 40% / 4px 4px no-repeat, linear-gradient(135deg, var(--sun) 50%, transparent 50%) right 0 top 40% / 4px 4px no-repeat; }
 .kpick select { position: absolute; inset: -6px -4px; width: calc(100% + 8px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
 .kpick:focus-within .kref { outline: 2px solid var(--sun); outline-offset: 2px; }
-.stat.live .v.off { color: var(--muted); }
 .actions { display: flex; gap: 8px; }
 .btn { flex: 1 1 0; font: 600 13px var(--font-body); padding: 11px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer; }
 .btn.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
@@ -1046,10 +1044,7 @@ function frame(now) {
       : "Like a phone <b>" + fmtLen(screenIn * zoom) + "</b> wide, showing <b>" + fmtLen(screenIn / zoom) + "</b> of model");
   const dCss = mainDiamCss(), dPx = dCss * dpr;
   const lit = dPx >= 1;
-  sScreen.classList.toggle("off", !lit);
-  setText(sScreen, "ss", lit
-    ? fmtLen(dCss / ppi) + " <small>" + (dPx < 1000 ? sig(dPx, 2) : Math.round(dPx).toLocaleString()) + " px</small>"
-    : sig(dPx, 2) + " px <small>too small, not drawn</small>");
+  setText(sScreen, "ss", fmtLen(dCss / ppi));
   if (theater()) setText(tInfo, "ti", "<b>" + obj.name + "</b> \u00b7 " + (obj.group ? "Ceres " : "") + fmtLen(mainKm() * IN_PER_KM) + " model \u00b7 on screen <em>" +
     (lit ? fmtLen(dCss / ppi) : "under 1 px") + "</em>");
   const showHint = !hintDismissed && dPx < 60;
