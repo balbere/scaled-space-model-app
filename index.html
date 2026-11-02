@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="Space Day">
 <meta name="theme-color" content="#0c0f17">
 <meta name="description" content="The official website of Space Day">
-<link rel="apple-touch-icon" href="icon-180.png">
-<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}</style>
 <title>Space Day</title>
@@ -533,9 +533,9 @@ const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onlo
 const tex = {};
 let ringTex = null;
 ["sun","mercury","venus","earth","moon","mars","asteroid","jupiter","saturn","uranus","neptune","pluto"].forEach(n => {
-  loadImg("" + n + ".jpg").then(img => { tex[n] = makeTex(img, gl.REPEAT); }).catch(() => {});
+  loadImg("textures/" + n + ".jpg").then(img => { tex[n] = makeTex(img, gl.REPEAT); }).catch(() => {});
 });
-loadImg("saturn_ring.png").then(img => { ringTex = makeTex(img, gl.CLAMP_TO_EDGE); }).catch(() => {});
+loadImg("textures/saturn_ring.png").then(img => { ringTex = makeTex(img, gl.CLAMP_TO_EDGE); }).catch(() => {});
 
 // pole orientation: tip the north pole toward the viewer by `view` degrees, then roll by the axial tilt
 function basis(b) {

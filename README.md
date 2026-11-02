@@ -7,8 +7,9 @@ Every object is drawn at its true model size, with the Sun-to-Pluto distance set
 ## What's here
 
 - `index.html`: the whole app (one page, no build step)
-- `*.jpg`, `saturn_ring.png`: planet surface maps
-- `icon-*.png`, `manifest.webmanifest`: home-screen icon and app settings
+- `textures/`: surface maps for the Sun, planets, Moon, Pluto and asteroids, plus Saturn's ring (`saturn_ring.png`)
+- `icons/`: Home Screen and browser-tab icons in three sizes (`icon-180.png`, `icon-192.png`, `icon-512.png`)
+- `manifest.webmanifest`: Home Screen app settings (name, colors, icons)
 - `spaceday-logo.jpg`: the Space Day logo shown in shared-link previews
 - `CNAME`: connects the custom domain. Don't delete it.
 
