@@ -284,8 +284,8 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
         <input id="scaleInput" type="number" inputmode="decimal" min="0.01" step="any" aria-label="Sun to Pluto distance">
         <select id="scaleUnit" aria-label="Unit">
           <option value="ft">feet</option>
-          <option value="mi">miles</option>
           <option value="yd">yards</option>
+          <option value="mi">miles</option>
         </select>
       </div>
       <div class="presets" id="presets"></div>
@@ -1080,7 +1080,7 @@ document.querySelectorAll(".tbar, #fsBtn").forEach(el => el.addEventListener("po
 // ---------- Scale sheet ----------
 const scaleSheet = document.getElementById("scaleSheet"), scaleInput = document.getElementById("scaleInput"), scaleUnitSel = document.getElementById("scaleUnit");
 const scalePreview = document.getElementById("scalePreview");
-const PRESETS = [[100,"ft"],[100,"yd","a football field"],[500,"ft"],[1,"mi"],[5,"mi"],[10,"mi"]];
+const PRESETS = [[100,"ft"],[100,"yd"],[1,"mi"]];
 const presetsEl = document.getElementById("presets");
 PRESETS.forEach(([v, u, note]) => {
   const b = document.createElement("button"); b.type = "button"; b.className = "preset";
