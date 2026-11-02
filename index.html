@@ -804,11 +804,12 @@ function refreshStatic() {
 
 // ---------- Distance between two objects ----------
 // Orbits treated as circles: closest when lined up on the same side of the Sun, farthest on opposite sides.
-let distRefId = "sun";
+let distRefId = "sun", distRefChosen = false;   // chosen = the viewer picked it, so keep it
 const distSel = document.getElementById("distRef"), distRefLabel = document.getElementById("distRefLabel");
 const MOON_AU = 384400 / AU_KM;   // average Earth-Moon distance
 const auSpan = o => o.sun ? [0, 0] : o.id === "moon" ? [1 - MOON_AU, 1 + MOON_AU] : [o.au, o.au];
 function renderDist() {
+  if (!distRefChosen) distRefId = "sun";                           // default: measure from the Sun
   if (distRefId === obj.id) distRefId = obj.id === "sun" ? "earth" : "sun";
   const ref = OBJECTS.find(o => o.id === distRefId);
   distSel.innerHTML = OBJECTS.filter(o => o.id !== obj.id)
@@ -832,7 +833,7 @@ function renderDist() {
     : (lo === 0 ? "0" : fmtFt(lo * FT_PER_AU)) + " to " + fmtFt(hi * FT_PER_AU) + "<br><small>" + note + "" + "</small>")
     + '<div class="trip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l3-3m6-11c3 0 5 2 5 5 0 3-3 7-7 9l-5-5c2-4 5-9 7-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="14" cy="10" r="1.6" fill="currentColor"/></svg>' + trip + '</div>';
 }
-distSel.addEventListener("change", () => { distRefId = distSel.value; renderDist(); });
+distSel.addEventListener("change", () => { distRefId = distSel.value; distRefChosen = true; renderDist(); });
 
 // Travel time at the speed SpaceX Starship has actually flown: above 25,700 km/h (about 16,000 mph), June 2024 test flight
 const PROBE_KMH = 25700;
