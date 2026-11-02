@@ -1107,7 +1107,8 @@ document.getElementById("scaleForm").addEventListener("submit", e => {
 
 // ---------- Calibration sheet ----------
 const calib = document.getElementById("calib"), slider = document.getElementById("ppiSlider"), cardBox = document.getElementById("cardBox");
-function drawCard() { cardBox.style.width = (2.125 * ppi) + "px"; cardBox.style.height = (1.1 * ppi) + "px"; }
+// only the width follows the slider (it is what gets matched to the card); the height stays fixed so the sheet doesn't move
+function drawCard() { cardBox.style.width = (2.125 * ppi) + "px"; cardBox.style.height = Math.round(1.1 * IPHONE15_CSS_PPI) + "px"; }
 deviceBtn.addEventListener("click", () => { slider.value = ppi; drawCard(); calib.hidden = false; });
 slider.addEventListener("input", () => { ppi = parseFloat(slider.value); calibrated = true; drawCard(); });
 document.getElementById("calibReset").addEventListener("click", () => { ppi = IPHONE15_CSS_PPI; calibrated = false; slider.value = ppi; drawCard(); try { localStorage.removeItem("ppi"); } catch (e) {} });
