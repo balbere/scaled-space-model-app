@@ -523,9 +523,9 @@ const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onlo
 const tex = {};
 let ringTex = null;
 ["sun","mercury","venus","earth","moon","mars","asteroid","jupiter","saturn","uranus","neptune","pluto"].forEach(n => {
-  loadImg("tex/" + n + ".jpg").then(img => { tex[n] = makeTex(img, gl.REPEAT); }).catch(() => {});
+  loadImg("" + n + ".jpg").then(img => { tex[n] = makeTex(img, gl.REPEAT); }).catch(() => {});
 });
-loadImg("tex/saturn_ring.png").then(img => { ringTex = makeTex(img, gl.CLAMP_TO_EDGE); }).catch(() => {});
+loadImg("saturn_ring.png").then(img => { ringTex = makeTex(img, gl.CLAMP_TO_EDGE); }).catch(() => {});
 
 // pole orientation: tip the north pole toward the viewer by `view` degrees, then roll by the axial tilt
 function basis(b) {
