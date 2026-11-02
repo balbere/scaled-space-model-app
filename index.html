@@ -54,7 +54,7 @@ body {
   overflow: hidden; -webkit-user-select: none; user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.app { height: 100%; display: flex; flex-direction: column; }
+.app { position: relative; height: 100%; display: flex; flex-direction: column; }
 .gutter {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -126,7 +126,9 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .about b { color: var(--sun); font-weight: 600; }
 .about a { color: var(--sun); }
 
-.sheet { position: absolute; inset: 0; background: rgba(0,0,0,.72); display: grid; place-items: end center; z-index: 5; }
+/* Sheets reach past the app's edges into the strips behind the clock and the home indicator
+   (those strips are zero in a normal browser tab), so they sit flush with the bottom of the screen */
+.sheet { position: absolute; inset: calc(-1 * env(safe-area-inset-top, 0px)) 0 calc(-1 * env(safe-area-inset-bottom, 0px)); padding-top: env(safe-area-inset-top, 0px); background: rgba(0,0,0,.72); display: grid; place-items: end center; z-index: 5; }
 .sheet .card { width: 100%; max-width: 520px; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding-block: 18px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
 .sheet h2 { font-family: var(--font-display); font-weight: 500; font-size: 17px; margin: 0; }
 .sheet p { margin: 0; color: var(--muted); line-height: 1.45; max-width: 60ch; }
