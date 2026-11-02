@@ -123,8 +123,6 @@ h1 { margin: 0; min-width: 0; }
 .kpick select { position: absolute; inset: -6px -4px; width: calc(100% + 8px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
 .kpick:focus-within .kref { outline: 2px solid var(--sun); outline-offset: 2px; }
 .stat.live .v.off { color: var(--muted); }
-.trip { display: flex; align-items: center; gap: 4px; font: 11.5px var(--font-body); color: var(--muted); margin-top: 3px; }
-.trip svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--sun); }
 .actions { display: flex; gap: 8px; }
 .btn { flex: 1 1 0; font: 600 13px var(--font-body); padding: 11px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer; }
 .btn.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
@@ -268,7 +266,7 @@ h1 { margin: 0; min-width: 0; }
     <div class="stats">
       <div class="stat"><div class="k" id="kModel">Model diameter</div><div class="v" id="sModel"></div></div>
       <div class="stat live"><div class="k">On your screen now</div><div class="v" id="sScreen"></div></div>
-      <div class="stat"><div class="k kpick">Distance from <span class="kref" id="distRefLabel">Sun</span><select id="distRef" aria-label="Distance from which object"></select></div><div class="v" id="sDist"></div></div>
+      <div class="stat"><div class="k"><span class="kpick"><span class="kref" id="distModeLabel">Distance</span><select id="distMode" aria-label="Show distance or travel time"><option value="dist">Distance</option><option value="time">Time</option></select></span> from <span class="kpick"><span class="kref" id="distRefLabel">Sun</span><select id="distRef" aria-label="Measured from which object"></select></span></div><div class="v" id="sDist"></div></div>
       <div class="stat"><div class="k" id="kReal">Real diameter</div><div class="v" id="sReal"></div></div>
     </div>
     <div class="actions">
@@ -803,6 +801,9 @@ function refreshStatic() {
 
 // ---------- Distance between two objects ----------
 // Orbits treated as circles: closest when lined up on the same side of the Sun, farthest on opposite sides.
+let distMode = "dist";   // "dist" = model distance, "time" = Starship travel time
+try { if (localStorage.getItem("distMode") === "time") distMode = "time"; } catch (e) {}
+const distModeSel = document.getElementById("distMode"), distModeLabel = document.getElementById("distModeLabel");
 let distRefId = "sun", distRefChosen = false;   // chosen = the viewer picked it, so keep it
 const distSel = document.getElementById("distRef"), distRefLabel = document.getElementById("distRefLabel");
 const MOON_AU = 384400 / AU_KM;   // average Earth-Moon distance
@@ -826,13 +827,25 @@ function renderDist() {
     lo = Math.max(0, Math.max(A[0], B[0]) - Math.min(A[1], B[1])); hi = A[1] + B[1];
     note = "closest to farthest";
   }
+  // one line: either the model distance or the Starship travel time; a range means closest to farthest
+  const fmt = distMode === "time" ? fmtTrip : au => fmtFt(au * FT_PER_AU);
   const el = document.getElementById("sDist");
-  const trip = lo === hi ? fmtTrip(lo) : lo === 0 ? "up to " + fmtTrip(hi) : fmtTrip(lo, true) + " to " + fmtTrip(hi);
-  el.innerHTML = (lo === hi ? fmtFt(lo * FT_PER_AU)
-    : (lo === 0 ? "0" : fmtFt(lo * FT_PER_AU)) + " to " + fmtFt(hi * FT_PER_AU) + "<br><small>" + note + "" + "</small>")
-    + '<div class="trip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l3-3m6-11c3 0 5 2 5 5 0 3-3 7-7 9l-5-5c2-4 5-9 7-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="14" cy="10" r="1.6" fill="currentColor"/></svg>' + trip + '</div>';
+  el.textContent = lo === hi ? fmt(lo) : joinRange(fmt(lo), fmt(hi));
+  el.title = lo === hi ? "" : "Closest to farthest";
+  distModeLabel.textContent = distMode === "time" ? "Time" : "Distance";
+  distModeSel.value = distMode;
+}
+// "6.63 ft" + "31.9 ft" -> "6.63–31.9 ft"; mixed units keep both: "5.4 months – 3.1 years"
+function joinRange(a, b) {
+  const ua = a.replace(/^[\d.,]+ /, ""), ub = b.replace(/^[\d.,]+ /, "");
+  return ua === ub ? a.slice(0, a.length - ua.length - 1) + "\u2013" + b : a + " \u2013 " + b;
 }
 distSel.addEventListener("change", () => { distRefId = distSel.value; distRefChosen = true; renderDist(); });
+distModeSel.addEventListener("change", () => {
+  distMode = distModeSel.value;
+  try { localStorage.setItem("distMode", distMode); } catch (e) {}
+  renderDist();
+});
 
 // Travel time at the speed SpaceX Starship has actually flown: above 25,700 km/h (about 16,000 mph), June 2024 test flight
 const PROBE_KMH = 25700;
