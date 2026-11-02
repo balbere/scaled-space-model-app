@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Solar Scale">
+<meta name="theme-color" content="#0c0f17">
+<meta name="description" content="Pinch-to-zoom scale model of the solar system, at true size on your phone.">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}</style>
+<title>500-Foot Solar System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen instrument. Object picker on top, a black viewing field in the middle, a readout panel below. Deliberately single dark theme (space). */
+:root {
+  --void: #000000;
+  --panel: #0c0f17;
+  --panel-2: #141927;
+  --line: #262d40;
+  --ink: #eceff6;
+  --muted: #8b93a9;
+  --sun: #ffb84d;
+  --sun-dim: #7a5a2a;
+  --font-display: "Unbounded", "Avenir Next", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--void); color: var(--ink);
+  font-family: var(--font-body); font-size: 14px;
+  overflow: hidden; -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.app { height: 100%; display: flex; flex-direction: column; }
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+header { background: var(--panel); border-bottom: 1px solid var(--line); }
+.titlebar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 8px 2px; }
+h1 { margin: 0; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand h1 { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.01em; white-space: nowrap; }
+.brand h1 span { color: var(--sun); }
+.gear { width: 34px; height: 34px; margin-left: -6px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 9px; background: none; color: var(--muted); cursor: pointer; transition: color .2s, background .2s; }
+.gear svg { width: 21px; height: 21px; transition: transform .5s ease; }
+.gear:hover, .gear:active { color: var(--sun); background: var(--panel-2); }
+.gear:hover svg, .gear:active svg { transform: rotate(60deg); }
+.scalebtn { background: none; border: 0; padding: 4px 0; color: var(--ink); cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.01em; white-space: nowrap; text-align: left; }
+.scalebtn span { color: var(--sun); }
+.scalebtn b { text-decoration: underline dotted var(--muted); text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.scalebtn em { font-style: normal; font-family: var(--font-body); font-weight: 500; font-size: 11px; color: var(--muted); margin-left: 6px; text-decoration: underline dotted; text-underline-offset: 3px; }
+.device { font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; white-space: nowrap; }
+.device:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-block: 6px 10px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px 6px 6px; font: 500 13px var(--font-body); cursor: pointer;
+}
+.chip i { width: 18px; height: 18px; border-radius: 50%; display: block; }
+.chip i.belt { background: radial-gradient(circle, #9a948c 0 1.5px, transparent 2px) 2px 3px / 7px 6px, var(--panel); border: 1px dashed #6d6860; box-sizing: border-box; }
+.chip[aria-pressed="true"] { border-color: var(--sun); background: #241b0c; }
+
+.stage { position: relative; flex: 1 1 auto; min-height: 0; touch-action: none; background: var(--void); overflow: hidden; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.hud { position: absolute; left: 0; right: 0; top: 0; pointer-events: none; padding-block: 12px 0; }
+.zoomrow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.zoomval { font-family: var(--font-mono); font-weight: 500; font-size: 30px; line-height: 1; color: var(--sun); font-variant-numeric: tabular-nums; }
+.zoomlab { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.meter { position: relative; height: 26px; margin-top: 10px; }
+.meter .track { position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--panel-2); }
+.meter .fill { position: absolute; left: 0; top: 6px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--sun-dim), var(--sun)); width: 0; }
+.meter .tick { position: absolute; top: 13px; font: 10px var(--font-mono); color: var(--muted); transform: translateX(-50%); }
+.meter .tick::before { content: ""; position: absolute; left: 50%; top: -9px; width: 1px; height: 6px; background: var(--muted); opacity: .6; }
+.meter .tick:first-child { transform: none; }
+.meter .tick:first-child::before { left: 0; }
+.meter .tick:last-child { transform: translateX(-100%); }
+.meter .tick:last-child::before { left: auto; right: 0; }
+.equiv { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+.equiv b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); pointer-events: none; font-size: 12px; color: var(--muted); background: rgba(12,15,23,.85); border: 1px solid var(--line); padding: 5px 10px; border-radius: 999px; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+
+.panel { background: var(--panel); border-top: 1px solid var(--line); padding-block: 12px 12px; display: grid; gap: 10px; }
+.namerow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.pname { font-family: var(--font-display); font-weight: 500; font-size: 22px; margin: 0; text-wrap: balance; white-space: nowrap; }
+.like { color: var(--muted); font-size: 13px; text-align: right; min-width: 0; }
+.like b { color: var(--ink); font-weight: 500; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.stat { min-width: 0; }
+.stat .k { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat .v small { color: var(--muted); font-size: 11.5px; }
+.stat.live .v { color: var(--sun); }
+.kpick { position: relative; display: inline-block; }
+.kref { color: var(--sun); padding-right: 11px; border-bottom: 1px dotted var(--sun-dim); background: linear-gradient(45deg, transparent 50%, var(--sun) 50%) right 3px top 40% / 4px 4px no-repeat, linear-gradient(135deg, var(--sun) 50%, transparent 50%) right 0 top 40% / 4px 4px no-repeat; }
+.kpick select { position: absolute; inset: -6px -4px; width: calc(100% + 8px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.kpick:focus-within .kref { outline: 2px solid var(--sun); outline-offset: 2px; }
+.stat.live .v.off { color: var(--muted); }
+.trip { display: flex; align-items: center; gap: 4px; font: 11.5px var(--font-body); color: var(--muted); margin-top: 3px; }
+.trip svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--sun); }
+.actions { display: flex; gap: 8px; }
+.btn { flex: 1 1 0; font: 600 13px var(--font-body); padding: 11px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
+.credit { font-size: 10px; color: var(--muted); line-height: 1.4; }
+.credit a { color: var(--muted); }
+
+.sheet { position: absolute; inset: 0; background: rgba(0,0,0,.72); display: grid; place-items: end center; z-index: 5; }
+.sheet .card { width: 100%; max-width: 520px; box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding-block: 18px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+.sheet h2 { font-family: var(--font-display); font-weight: 500; font-size: 17px; margin: 0; }
+.sheet p { margin: 0; color: var(--muted); line-height: 1.45; max-width: 60ch; }
+.cardbox { height: 0; border: 2px solid var(--sun); border-bottom: 0; border-radius: 10px 10px 0 0; box-sizing: border-box; max-width: 100%; }
+.sheet input[type=range] { width: 100%; accent-color: var(--sun); }
+.sheet .row { display: flex; gap: 8px; }
+.field { display: flex; align-items: center; gap: 8px; }
+.field input { flex: 1 1 auto; min-width: 0; font: 500 22px var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.field select { font: 500 15px var(--font-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 10px; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset { font: 500 12.5px var(--font-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+.sheet .card { max-height: 100%; overflow-y: auto; }
+.sheet h3.sub { font: 600 11px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -4px; }
+.field .unit { font: 500 15px var(--font-body); color: var(--muted); }
+.preview { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.preview b { color: var(--ink); font-weight: 500; }
+.err { padding: 24px; color: var(--muted); }
+
+/* Full-screen viewing mode: only the black field, with a picker column on the right */
+.iconbtn { position: absolute; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: rgba(20,25,39,.85); color: var(--ink); cursor: pointer; padding: 0; }
+.iconbtn svg { width: 18px; height: 18px; }
+.app.theater header, .app.theater .panel, .app.theater #fsBtn { display: none; }
+.tbar { display: none; }
+.app.theater .tbar { display: flex; flex-direction: row; align-items: stretch; gap: 6px; position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); z-index: 2; }
+@media (min-width: 600px) { .app.theater .tbar { left: auto; width: 440px; } }
+.tbar button { min-height: 42px; }
+.tbar button { font: 500 12px var(--font-body); color: var(--ink); background: rgba(20,25,39,.85); border: 1px solid var(--line); cursor: pointer; }
+.texit { display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; padding: 8px; }
+.texit svg { width: 14px; height: 14px; }
+.tdrop { position: relative; flex: 1 1 auto; min-width: 0; }
+.tspace { display: none; }
+.texit { flex: 0 0 auto; padding: 8px 12px !important; }
+.tbar .tsel { width: 100%; height: 100%; display: flex; align-items: center; gap: 8px; border-radius: 10px; padding: 6px 10px 6px 10px; text-align: left; font-weight: 600; font-size: 13px; }
+.tsel span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tsel > svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--sun); transition: transform .2s; }
+.tsel[aria-expanded="true"] { border-color: var(--sun); }
+.tsel > svg { transform: rotate(180deg); }
+.tsel[aria-expanded="true"] > svg { transform: none; }
+.tsel i { width: 18px; height: 18px; border-radius: 50%; display: block; flex: 0 0 auto; }
+.tsel i.belt { background: radial-gradient(circle, #9a948c 0 1.5px, transparent 2px) 2px 3px / 7px 6px, var(--panel); border: 1px dashed #6d6860; box-sizing: border-box; }
+.tpicker { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding: 5px; background: rgba(12,15,23,.96); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.6); scrollbar-width: none; overscroll-behavior: contain; touch-action: pan-y; z-index: 3; }
+.tpicker::-webkit-scrollbar { display: none; }
+.tbar .tchip { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; border-radius: 8px; padding: 6px 8px 6px 5px; text-align: left; background: none; border-color: transparent; }
+.tchip i { width: 16px; height: 16px; border-radius: 50%; display: block; flex: 0 0 auto; }
+.tchip i.belt { background: radial-gradient(circle, #9a948c 0 1.5px, transparent 2px) 2px 3px / 7px 6px, var(--panel); border: 1px dashed #6d6860; box-sizing: border-box; }
+.tbar .tchip[aria-pressed="true"] { border-color: var(--sun-dim); background: #241b0c; color: var(--sun); }
+.trow { display: flex; gap: 6px; }
+.trow { flex: 0 0 auto; }
+.trow button { flex: 0 0 auto; min-width: 48px; border-radius: 10px; padding: 8px 4px; font-weight: 600; }
+.trow button.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
+.app.theater .hint { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 86px); }
+.app.theater .zoomval { font-size: 24px; }
+.tinfo { display: none; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.tinfo b { color: var(--ink); font-weight: 600; }
+.tinfo em { font-style: normal; color: var(--sun); font-variant-numeric: tabular-nums; }
+.app.theater .tinfo { display: block; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="gutter">
+    <div class="titlebar">
+      <div class="brand">
+        <button class="gear" id="scaleBtn" type="button" aria-label="Model settings" title="Model settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <h1>Solar <span>System</span></h1>
+      </div>
+      <button class="device" id="deviceBtn" type="button">iPhone 15 &middot; 460 ppi</button>
+    </div>
+    <div class="chips" id="chips" role="toolbar" aria-label="Choose what to view"></div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="bg"></canvas>
+    <canvas id="gl"></canvas>
+    <canvas id="ov"></canvas>
+    <div class="hud gutter">
+      <div class="zoomrow">
+        <div class="zoomval" id="zoomVal">&times;1</div>
+        <div class="zoomlab" id="zoomLab">true model size</div>
+      </div>
+      <div class="meter" aria-hidden="true">
+        <div class="track"></div><div class="fill" id="meterFill"></div>
+        <div id="ticks"></div>
+      </div>
+      <div class="equiv" id="equiv"></div>
+      <div class="tinfo" id="tInfo"></div>
+    </div>
+    <button class="iconbtn" id="fsBtn" type="button" aria-label="Full screen view" title="Full screen view">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+    <div class="tbar">
+      <button class="texit" id="fsExit" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>Exit</button>
+      <div class="tdrop">
+        <button class="tsel" id="tSel" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="tPicker"><i></i><span id="tSelName">Earth</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="tpicker" id="tPicker" role="menu" aria-label="Choose what to view" hidden></div>
+      </div>
+      <div class="tspace"></div>
+      <div class="trow"><button id="tTrue" type="button">&times;1</button><button id="tFill" class="primary" type="button">Fill</button></div>
+    </div>
+    <div class="hint" id="hint">Pinch out to zoom in</div>
+  </div>
+
+  <section class="panel gutter">
+    <div class="namerow">
+      <h2 class="pname" id="pName">Earth</h2>
+      <div class="like" id="pLike"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k" id="kModel">Model diameter</div><div class="v" id="sModel"></div></div>
+      <div class="stat live"><div class="k">On your screen now</div><div class="v" id="sScreen"></div></div>
+      <div class="stat"><div class="k kpick">Distance from <span class="kref" id="distRefLabel">Sun</span><select id="distRef" aria-label="Distance from which object"></select></div><div class="v" id="sDist"></div></div>
+      <div class="stat"><div class="k" id="kReal">Real diameter</div><div class="v" id="sReal"></div></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnTrue" type="button">True size &times;1</button>
+      <button class="btn primary" id="btnFill" type="button">Zoom to fill</button>
+    </div>
+    <div class="credit" id="credit"></div>
+  </section>
+
+  <div class="sheet" id="scaleSheet" hidden>
+    <form class="card gutter" id="scaleForm">
+      <h2>Model settings</h2>
+      <h3 class="sub">Size of the model</h3>
+      <p>How far from the Sun is Pluto in your model? Every planet sits at its average distance from the Sun, scaled from this one number. Pluto's average distance is 39.5 times Earth's.</p>
+      <div class="field">
+        <input id="scaleInput" type="number" inputmode="decimal" min="0.01" step="any" aria-label="Sun to Pluto distance">
+        <select id="scaleUnit" aria-label="Unit">
+          <option value="ft">feet</option>
+          <option value="mi">miles</option>
+          <option value="m">meters</option>
+          <option value="km">km</option>
+        </select>
+      </div>
+      <div class="presets" id="presets"></div>
+      <div class="preview" id="scalePreview"></div>
+      <h3 class="sub">Zoom speed</h3>
+      <p>Seconds for the True size and Zoom to fill buttons to take Earth from true size to filling the screen. Every planet zooms at this same speed.</p>
+      <div class="field">
+        <input id="speedInput" type="number" inputmode="decimal" min="0.5" max="600" step="any" aria-label="Zoom seconds for Earth">
+        <span class="unit">seconds</span>
+      </div>
+      <div class="presets" id="speedPresets"></div>
+      <div class="row">
+        <button class="btn" id="scaleCancel" type="button">Cancel</button>
+        <button class="btn primary" type="submit">Use this scale</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="sheet" id="calib" hidden>
+    <div class="card gutter">
+      <h2>Match your screen</h2>
+      <p>Hold a credit card or driver's license against the screen, turned so its short edge runs across. Slide until the outline is exactly as wide as that short edge.</p>
+      <div class="cardbox" id="cardBox"></div>
+      <input type="range" id="ppiSlider" min="90" max="220" step="0.1" aria-label="Screen pixels per inch">
+      <div class="row">
+        <button class="btn" id="calibReset" type="button">iPhone 15 default</button>
+        <button class="btn primary" id="calibDone" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const X = "×";
+// ---------- Scale ----------
+const AU_KM = 149597870.7;
+const PLUTO_AU = 39.5;
+const IPHONE15_CSS_PPI = 460 / 3;          // 460 physical ppi at 3x = 153.33 CSS px per inch
+const MIN_ZOOM = 0.01, MAX_ZOOM = 1e6;
+const UNIT_FT = { ft: 1, mi: 5280, m: 3.28084, km: 3280.84 };
+
+let scaleFt = 500, scaleUnit = "ft";
+try {
+  const s = JSON.parse(localStorage.getItem("scale") || "null");
+  if (s && s.ft > 0 && UNIT_FT[s.unit]) { scaleFt = s.ft; scaleUnit = s.unit; }
+} catch (e) {}
+let IN_PER_KM, FT_PER_AU;
+function applyScale() {
+  IN_PER_KM = (scaleFt * 12) / (PLUTO_AU * AU_KM);
+  FT_PER_AU = scaleFt / PLUTO_AU;
+}
+applyScale();
+
+// ---------- Objects ----------
+// km: diameter used for the readouts. axes: rendered radii ratios [screen x, screen y (pole), depth] for lumpy bodies.
+const OBJECTS = [
+  { id:"sun", name:"Sun", tex:"sun", km:1392700, au:0, dayH:609, obl:7.25, view:6, swatch:"#ffb547", sun:true },
+  { id:"mercury", name:"Mercury", tex:"mercury", km:4879,   au:0.387, dayH:1407.6, obl:0.03, view:12, swatch:"#9a9690", limb:0.0, atmo:0 },
+  { id:"venus",   name:"Venus",   tex:"venus", km:12104,  au:0.723, dayH:-96,    obl:2.6,  view:10, swatch:"#e3c98f", limb:0.35, atmo:0.25, atmoCol:[1,0.9,0.7] },
+  { id:"earth",   name:"Earth",   tex:"earth", km:12742,  au:1.000, dayH:23.93,  obl:23.4, view:12, swatch:"#3d6fb0", limb:0.0, atmo:0.6, atmoCol:[0.45,0.7,1] },
+  { id:"moon",    name:"Moon",    tex:"moon", km:3474.8, au:1.000, dayH:655.7, obl:1.5, view:6, swatch:"#a9a8a4", limb:0.0, atmo:0, off:0.5 },
+  { id:"mars",    name:"Mars",    tex:"mars", km:6779,   au:1.524, dayH:24.62,  obl:25.2, view:12, swatch:"#c2643a", limb:0.0, atmo:0.15, atmoCol:[1,0.75,0.6] },
+  { id:"belt", name:"Asteroid belt", short:"Asteroids", group:true, au:2.7, members:[
+      { name:"Ceres",  tex:"asteroid", km:939, dims:[964, 892, 964], dayH:9.07,  obl:4,  view:10, tint:[0.42,0.42,0.43], off:0.1 },
+      { name:"Vesta",  tex:"asteroid", km:525, dims:[573, 446, 557], dayH:5.34,  obl:29, view:10, tint:[0.80,0.75,0.68], off:0.4 },
+      { name:"Pallas", tex:"asteroid", km:512, dims:[568, 448, 532], dayH:7.81,  obl:84, view:10, tint:[0.58,0.60,0.63], off:0.65 },
+      { name:"Hygiea", tex:"asteroid", km:434, dims:[450, 424, 430], dayH:13.8,  obl:60, view:10, tint:[0.33,0.32,0.31], off:0.85 } ] },
+  { id:"jupiter", name:"Jupiter", tex:"jupiter", km:139820, au:5.203, dayH:9.93,   obl:3.1,  view:8,  swatch:"#c9a27a", limb:0.45, atmo:0 },
+  { id:"saturn",  name:"Saturn",  tex:"saturn", km:116460, au:9.537, dayH:10.66,  obl:26.7, view:22, swatch:"#dcc596", limb:0.4, atmo:0, ring:true },
+  { id:"uranus",  name:"Uranus",  tex:"uranus", km:50724,  au:19.19, dayH:-17.24, obl:97.8, view:10, swatch:"#a6dbe2", limb:0.45, atmo:0.2, atmoCol:[0.75,0.95,1] },
+  { id:"neptune", name:"Neptune", tex:"neptune", km:49244,  au:30.07, dayH:16.11,  obl:28.3, view:10, swatch:"#3f63d6", limb:0.45, atmo:0.2, atmoCol:[0.5,0.65,1] },
+  { id:"pluto",   name:"Pluto",   tex:"pluto", km:2377,   au:39.5,  dayH:-153.3, obl:15, view:22, off:0.5, swatch:"#c9b8a3", limb:0.0, atmo:0.08, atmoCol:[0.6,0.7,1] },
+];
+const RING_IN = 74658 / 58232, RING_OUT = 136775 / 58232; // C-ring inner to A-ring outer, in Saturn radii
+
+// Group layout: members side by side, gaps of half the largest body, all in km
+OBJECTS.filter(o => o.group).forEach(g => {
+  const big = Math.max(...g.members.map(m => m.dims[0]));
+  const gap = big * 0.55;
+  let x = 0;
+  g.members.forEach((m, i) => { m.x = x + m.dims[0] / 2; x += m.dims[0] + gap; });
+  const total = x - gap;
+  g.members.forEach(m => { m.x -= total / 2; });
+  g.extentKm = total; g.km = g.members[0].km;
+});
+
+// Earth and Moon always appear together, at their true separation (384,400 km), Moon to the lower left
+{
+  const D = 384400, ux = -0.94, uy = 0.34;
+  OBJECTS.find(o => o.id === "earth").companions = [{ id: "moon", x: D * ux, y: D * uy }];
+  OBJECTS.find(o => o.id === "moon").companions = [{ id: "earth", x: -D * ux, y: -D * uy }];
+}
+
+// Everyday objects for "about the size of" (diameter or width, mm)
+const REFS = [
+  [0.008, "a red blood cell"], [0.03, "a speck of dust"], [0.07, "the width of a human hair"],
+  [0.1, "the thickness of a sheet of paper"], [0.3, "a grain of table salt"], [0.6, "a grain of sand"],
+  [1, "a poppy seed"], [2, "a sesame seed"], [4, "a peppercorn"], [8, "a pea"], [16, "a marble"],
+  [24, "a quarter"], [43, "a golf ball"], [67, "a tennis ball"], [100, "an orange"], [140, "a grapefruit"],
+  [220, "a soccer ball"], [300, "a basketball, about"], [500, "a beach ball"], [750, "a yoga ball"],
+  [1200, "a round café table"], [1800, "a tall man, lying down"], [3600, "a backyard trampoline"],
+  [7000, "a merry-go-round"], [15000, "a basketball court's width"], [30000, "a small house lot"],
+  [70000, "a football field"], [200000, "a city block or two"], [1e6, "a small town"],
+];
+function likeText(mm) {
+  let best = REFS[0], bd = Infinity;
+  for (const r of REFS) { const d = Math.abs(Math.log(mm / r[0])); if (d < bd) { bd = d; best = r; } }
+  const ratio = mm / best[0];
+  const q = ratio > 1.3 ? "a bit bigger than" : ratio < 0.77 ? "a bit smaller than" : "about the size of";
+  return { q, what: best[1].replace(/, about$/, "") };
+}
+
+// ---------- Screen calibration ----------
+const isIphone15Size = () => {
+  const w = Math.min(screen.width, screen.height), h = Math.max(screen.width, screen.height);
+  return w === 393 && h === 852 && Math.round(devicePixelRatio) === 3;
+};
+let ppi = IPHONE15_CSS_PPI, calibrated = false;
+try { const s = parseFloat(localStorage.getItem("ppi")); if (s > 50 && s < 400) { ppi = s; calibrated = true; } } catch (e) {}
+const deviceBtn = document.getElementById("deviceBtn");
+function updateDeviceLabel() {
+  if (calibrated) deviceBtn.textContent = "Calibrated · " + (ppi * devicePixelRatio).toFixed(0) + " ppi";
+  else if (isIphone15Size()) deviceBtn.textContent = "iPhone 15 · 460 ppi";
+  else deviceBtn.textContent = "Not an iPhone 15? Calibrate";
+}
+updateDeviceLabel();
+
+// ---------- State ----------
+let obj = OBJECTS.find(o => o.id === "earth");
+let zoom = 1;
+let cx = 0, cy = 0;          // object centre in stage CSS px
+let stageW = 0, stageH = 0, dpr = Math.min(devicePixelRatio || 1, 3);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const mainKm = () => obj.group ? obj.members[0].km : obj.km;           // the body the readouts describe
+const pxPerKm = () => IN_PER_KM * ppi * zoom;                          // CSS px per real km at this zoom
+const mainDiamCss = () => mainKm() * pxPerKm();
+const extentCss = () => obj.group ? obj.extentKm * pxPerKm() : mainDiamCss() * (obj.ring ? RING_OUT : 1);
+
+// ---------- Chips ----------
+const chips = document.getElementById("chips"), tPicker = document.getElementById("tPicker");
+const tSel = document.getElementById("tSel");
+function closeDrop() { if (!tPicker.hidden) { tPicker.hidden = true; tSel.setAttribute("aria-expanded", "false"); } }
+function openDrop() {
+  const above = tSel.getBoundingClientRect().top - stage.getBoundingClientRect().top;
+  tPicker.style.maxHeight = Math.max(120, above - 16) + "px";
+  tPicker.hidden = false; tSel.setAttribute("aria-expanded", "true");
+  const cur = document.getElementById("tchip-" + obj.id); if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+const app = document.querySelector(".app");
+const theater = () => app.classList.contains("theater");
+OBJECTS.forEach(o => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.id = "chip-" + o.id; b.dataset.id = o.id;
+  const sw = o.group ? '<i class="belt"></i>'
+    : o.sun ? '<i style="background:radial-gradient(circle at 50% 50%, #fff3c4, #ffb547 55%, #c25d10 100%)"></i>'
+    : `<i style="background:radial-gradient(circle at 35% 35%, ${o.swatch}, #000 120%)"></i>`;
+  b.innerHTML = sw + (o.short || o.name);
+  b.addEventListener("click", () => selectObject(o));
+  chips.appendChild(b);
+  const t = document.createElement("button");
+  t.className = "tchip"; t.type = "button"; t.dataset.id = o.id; t.id = "tchip-" + o.id;
+  t.innerHTML = sw + (o.short || o.name);
+  t.addEventListener("click", () => selectObject(o));
+  tPicker.appendChild(t);
+});
+
+// ---------- WebGL ----------
+const glc = document.getElementById("gl");
+const gl = glc.getContext("webgl2", { premultipliedAlpha: true, antialias: false, alpha: true });
+const ov = document.getElementById("ov"), ctx = ov.getContext("2d");
+if (!gl) { document.getElementById("stage").innerHTML = '<p class="err">This viewer needs WebGL 2, which this browser does not offer.</p>'; return; }
+
+const VS = `#version 300 es
+in vec2 a; void main(){ gl_Position = vec4(a,0.,1.); }`;
+const FS = `#version 300 es
+precision highp float;
+uniform vec2 uC; uniform float uR; uniform vec3 uAx;
+uniform sampler2D uTex; uniform sampler2D uRing; uniform float uHasRing;
+uniform mat3 uM; uniform float uRot; uniform float uOff; uniform vec3 uL; uniform vec3 uTint;
+uniform float uLimb; uniform float uAtmo; uniform vec3 uAtmoCol; uniform float uSun;
+uniform float uRin; uniform float uRout;
+out vec4 o;
+const float PI = 3.14159265;
+void main(){
+  vec2 q = gl_FragCoord.xy - uC;
+  vec2 d = q / uR;
+  vec2 e = d / uAx.xy;                 // unit-sphere coordinates of an ellipsoid
+  float r = length(e);
+  float edge = clamp((1. - r) * uR * min(uAx.x, uAx.y) + .5, 0., 1.);
+  vec2 ee = r > .9995 ? e / r * .9995 : e;
+  vec3 s = vec3(ee, sqrt(max(0., 1. - dot(ee, ee))));      // texture direction
+  vec3 n = normalize(s / uAx);                               // surface normal
+  vec3 b = transpose(uM) * s;
+  float lon = atan(b.x, b.z) - uRot + uOff;
+  float lat = asin(clamp(b.y, -1., 1.));
+  vec2 uv = vec2(lon / (2. * PI), .5 - lat / PI);
+  vec2 gx = dFdx(uv), gy = dFdy(uv);
+  gx.x -= floor(gx.x + .5); gy.x -= floor(gy.x + .5);
+  vec3 t = textureGrad(uTex, vec2(fract(uv.x), uv.y), gx, gy).rgb * uTint;
+  vec4 col;
+  if (uSun > .5) {
+    float mu = s.z;
+    float limb = 0.32 + 0.68 * pow(mu, 0.55);            // strong limb darkening
+    vec3 lit = min(t * 1.25 * limb + vec3(0.06, 0.03, 0.), 1.);
+    col = vec4(lit * edge, edge);
+    float halo = r > 1. ? 0.5 * exp(-(r - 1.) * 14.) : 0.;
+    col += vec4(vec3(1., .62, .25) * halo, halo) * (1. - col.a);
+  } else {
+    float diff = max(dot(n, uL), 0.);
+    float limb = mix(1., sqrt(max(s.z, 0.)), uLimb);
+    vec3 lit = t * (0.025 + 0.975 * diff) * limb;
+    float rim = pow(1. - s.z, 3.) * uAtmo * smoothstep(-.2, .6, dot(n, uL));
+    lit += uAtmoCol * rim;
+    col = vec4(lit * edge, edge);
+  }
+  if (uHasRing > .5) {
+    vec3 N = uM[1];
+    float nz = abs(N.z) < .02 ? .02 * sign(N.z + 1e-6) : N.z;
+    float z = -(N.x * d.x + N.y * d.y) / nz;
+    vec3 P = vec3(d, z);
+    float rho = length(P);
+    float u = (rho - uRin) / (uRout - uRin);
+    if (u > 0. && u < 1.) {
+      vec4 rc = texture(uRing, vec2(u, .5));
+      float pl = dot(P, uL);
+      float sh = 1.;
+      if (pl < 0. && length(P - pl * uL) < 1.) sh = .08;
+      vec3 rcol = min(rc.rgb * 1.3, 1.) * sh * (.4 + .6 * abs(dot(N, uL)));
+      float ra = rc.a * .95;
+      bool front = edge <= 0. || z > s.z;
+      if (front) col = vec4(rcol * ra, ra) + col * (1. - ra);
+      else col = col + vec4(rcol * ra, ra) * (1. - col.a);
+    }
+  }
+  o = col;
+}`;
+function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog); gl.useProgram(prog);
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aLoc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(aLoc); gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+const U = {}; ["uC","uR","uAx","uTex","uRing","uHasRing","uM","uRot","uOff","uL","uTint","uLimb","uAtmo","uAtmoCol","uSun","uRin","uRout"].forEach(k => U[k] = gl.getUniformLocation(prog, k));
+gl.uniform1i(U.uTex, 0); gl.uniform1i(U.uRing, 1);
+const L = (() => { const v = [-0.45, 0.25, 0.86]; const m = Math.hypot(...v); return v.map(x => x / m); })();
+gl.uniform3fv(U.uL, L); gl.uniform1f(U.uRin, RING_IN); gl.uniform1f(U.uRout, RING_OUT);
+gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+function makeTex(img, wrapS) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+const tex = {};
+let ringTex = null;
+["sun","mercury","venus","earth","moon","mars","asteroid","jupiter","saturn","uranus","neptune","pluto"].forEach(n => {
+  loadImg("tex/" + n + ".jpg").then(img => { tex[n] = makeTex(img, gl.REPEAT); }).catch(() => {});
+});
+loadImg("tex/saturn_ring.png").then(img => { ringTex = makeTex(img, gl.CLAMP_TO_EDGE); }).catch(() => {});
+
+// pole orientation: tip the north pole toward the viewer by `view` degrees, then roll by the axial tilt
+function basis(b) {
+  const a = b.view * Math.PI / 180, g = -b.obl * Math.PI / 180;
+  const ca = Math.cos(a), sa = Math.sin(a), cg = Math.cos(g), sg = Math.sin(g);
+  const rz = v => [v[0]*cg - v[1]*sg, v[0]*sg + v[1]*cg, v[2]];
+  return new Float32Array([...rz([1,0,0]), ...rz([0,ca,sa]), ...rz([0,-sa,ca])]);
+}
+// precompute per-body draw settings
+function bodiesOf(o) {
+  if (o._bodies) return o._bodies;
+  const list = o.group ? o.members.map(m => ({ m, x: m.x, y: 0 })) : [{ m: o, x: 0, y: 0 }];
+  (o.companions || []).forEach(c => list.push({ m: OBJECTS.find(q => q.id === c.id), x: c.x, y: c.y, companion: true }));
+  o._bodies = list.map(({ m, x, y, companion }) => {
+    const big = m.dims ? Math.max(...m.dims) : 1;
+    return {
+      src: m, name: m.name, texName: m.tex,
+      radKm: m.dims ? m.dims[0] / 2 : m.km / 2,
+      ax: m.dims ? [1, m.dims[1] / m.dims[0], m.dims[2] / m.dims[0]] : [1, 1, 1],
+      xKm: x || 0, yKm: y || 0, companion: !!companion, M: basis(m), dayH: m.dayH, ring: !!m.ring, sun: !!m.sun,
+      tint: m.tint || [1,1,1], off: (m.off || 0) * Math.PI * 2,
+      limb: m.limb || 0, atmo: m.atmo || 0, atmoCol: m.atmoCol || [0,0,0],
+    };
+  });
+  return o._bodies;
+}
+
+// ---------- Starry background (different for every object, never scales with zoom) ----------
+const bgc = document.getElementById("bg");
+const BG = {
+  sun:     { c: ["#ff9a3c", "#ff5e3a", "#ffd27a"], a: 0.05, stars: 0.8 },
+  mercury: { c: ["#c8b89a", "#8c7c66", "#e8dcc4"], a: 0.025, stars: 0.7 },
+  venus:   { c: ["#ffcf7a", "#e8a85a", "#b06a3a"], a: 0.04, stars: 0.9 },
+  earth:   { c: ["#4a7fd6", "#7aa7ff", "#c9d8ff", "#e6d9b8"], a: 0.05, stars: 1.2 },
+  moon:    { c: ["#9fb0c8", "#6c7a90", "#d0d8e6"], a: 0.04, stars: 1.3 },
+  mars:    { c: ["#ff6a4a", "#b8402a", "#ffb08a"], a: 0.045, stars: 1.0 },
+  belt:    { c: ["#c0a080", "#8a7055", "#e0c8a8"], a: 0.04, stars: 1.0 },
+  jupiter: { c: ["#b47cff", "#6a5cff", "#ff9ad5"], a: 0.05, stars: 1.1 },
+  saturn:  { c: ["#5fd4c4", "#e6c27a", "#3a8fb0"], a: 0.045, stars: 1.1 },
+  uranus:  { c: ["#7af0ff", "#4ab8d8", "#c6ffff"], a: 0.04, stars: 1.2 },
+  neptune: { c: ["#3a5cff", "#2a3aa0", "#7a9aff"], a: 0.05, stars: 1.3 },
+  pluto:   { c: ["#6a5a8a", "#3a3050", "#a08ac0"], a: 0.03, stars: 1.6 },
+};
+function rngFor(str) {
+  let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+function drawBackground() {
+  const W = bgc.width, H = bgc.height; if (!W || !H) return;
+  const g = bgc.getContext("2d"), th = BG[obj.id] || BG.earth, R = rngFor(obj.id + "-sky");
+  const gauss = () => (R() + R() + R() - 1.5) / 1.5;
+  g.globalCompositeOperation = "source-over"; g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+  const L = Math.hypot(W, H), ang = R() * Math.PI, bx = W * (0.25 + 0.5 * R()), by = H * (0.25 + 0.5 * R());
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const along = () => { const t = (R() - 0.5) * 1.3 * L, w = gauss() * L * 0.09; return [bx + ca * t - sa * w, by + sa * t + ca * w]; };
+  // glowing band of gas (like the Milky Way), then darker dust lanes through it
+  g.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 90; i++) {
+    const [x, y] = along(), r = (0.04 + 0.16 * R()) * L, col = th.c[(R() * th.c.length) | 0];
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, rgba(col, th.a * (0.3 + 0.7 * R()))); gr.addColorStop(1, rgba(col, 0));
+    g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  g.globalCompositeOperation = "source-over";
+  for (let i = 0; i < 40; i++) {
+    const [x, y] = along(), r = (0.02 + 0.06 * R()) * L;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, "rgba(0,0,0,0.35)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  // a few far-off galaxies
+  g.globalCompositeOperation = "lighter";
+  const ng = 1 + ((R() * 3) | 0);
+  for (let i = 0; i < ng; i++) {
+    const x = W * R(), y = H * R(), r = (6 + 14 * R()) * dpr;
+    g.save(); g.translate(x, y); g.rotate(R() * Math.PI); g.scale(1, 0.25 + 0.4 * R());
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+    gr.addColorStop(0, "rgba(255,240,220,0.35)"); gr.addColorStop(0.3, rgba(th.c[0], 0.12)); gr.addColorStop(1, rgba(th.c[0], 0));
+    g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill(); g.restore();
+  }
+  // stars: kept small and dim so a planet never gets lost among them
+  const temps = ["#bcd2ff", "#dfe8ff", "#ffffff", "#fff4dc", "#ffd9a8", "#ffb98a"];
+  const n = Math.round(W * H / (dpr * dpr) / 300 * th.stars);
+  for (let i = 0; i < n; i++) {
+    const [x, y] = R() < 0.45 ? along() : [W * R(), H * R()];
+    const p = Math.pow(R(), 7), r = (0.3 + p * 1.1) * dpr, a = 0.18 + Math.pow(R(), 2.5) * 0.6 + p * 0.3;
+    g.fillStyle = rgba(temps[(R() * temps.length) | 0], Math.min(1, a));
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    if (p > 0.45) {
+      const gr = g.createRadialGradient(x, y, 0, x, y, r * 6);
+      gr.addColorStop(0, rgba("#ffffff", 0.25)); gr.addColorStop(1, rgba("#ffffff", 0));
+      g.fillStyle = gr; g.fillRect(x - r * 6, y - r * 6, r * 12, r * 12);
+    }
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
+// ---------- Layout ----------
+const stage = document.getElementById("stage");
+// usable viewing area: in full-screen mode the picker column takes the right edge
+function view() {
+  if (theater()) {
+    // portrait-first: readouts across the top, controls and scale bar along the bottom, planet in between
+    const top = theaterTop, bottom = theaterBottom;
+    return { x: stageW / 2, y: top + (stageH - top - bottom) / 2, fit: Math.min(stageW * 0.9, (stageH - top - bottom) * 0.94) };
+  }
+  return { x: stageW / 2, y: stageH * 0.56, fit: Math.min(stageW * 0.86, (stageH - 150) * 0.9) };
+}
+const homeY = () => view().y;
+let theaterTop = 120, theaterBottom = 110, scaleY = 0;
+function measureTheater() {
+  const sr = stage.getBoundingClientRect();
+  if (theater()) {
+    const hb = document.querySelector(".hud").getBoundingClientRect().bottom - sr.top;
+    const bt = document.querySelector(".tbar").getBoundingClientRect().top - sr.top;
+    theaterTop = Math.max(60, hb + 6);
+    scaleY = bt - 12;                         // scale bar sits just above the controls
+    theaterBottom = Math.max(60, stageH - bt + 34);
+  } else scaleY = stageH - 22;
+}
+function resize() {
+  const r = stage.getBoundingClientRect();
+  const firstLayout = stageW === 0;
+  const oldW = stageW, oldH = stageH;
+  stageW = r.width; stageH = r.height; dpr = Math.min(devicePixelRatio || 1, 3);
+  [bgc, glc, ov].forEach(c => { c.width = Math.round(stageW * dpr); c.height = Math.round(stageH * dpr); });
+  drawBackground();
+  hudPadL = parseFloat(getComputedStyle(document.querySelector(".hud")).paddingLeft) || 16;
+  measureTheater();
+  if (firstLayout) { cx = view().x; cy = homeY(); }
+  else if (autoFit && !anim) refit();
+  else { cx += (stageW - oldW) / 2; cy += (stageH - oldH) / 2; }
+  clampCenter();
+}
+new ResizeObserver(resize).observe(stage);
+
+function clampCenter() {
+  // keep at least part of the object on screen
+  const h = Math.max(0, extentCss() / 2 - 20);
+  cx = Math.min(Math.max(cx, -h), stageW + h); cy = Math.min(Math.max(cy, -h), stageH + h);
+}
+
+// ---------- Gestures ----------
+const pts = new Map();
+let last = null;
+let autoFit = true;   // true until the user zooms after picking an object
+function refit() {
+  zoom = 1;
+  const f = view().fit;
+  if (extentCss() > f) zoom = f / extentCss();
+  cx = view().x; cy = homeY();
+}
+function zoomAbout(newZoom, sx, sy) {
+  autoFit = false;
+  newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom));
+  const k = newZoom / zoom;
+  cx = sx + (cx - sx) * k; cy = sy + (cy - sy) * k;
+  zoom = newZoom; clampCenter(); if (Math.abs(Math.log(zoom)) > 0.4) hintDismissed = true;
+}
+function localXY(e) { const r = stage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function gestureState() {
+  const a = [...pts.values()];
+  if (a.length >= 2) return { mx: (a[0][0] + a[1][0]) / 2, my: (a[0][1] + a[1][1]) / 2, d: Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]) };
+  if (a.length === 1) return { mx: a[0][0], my: a[0][1], d: 0 };
+  return null;
+}
+stage.addEventListener("pointerdown", e => { anim = null; stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, localXY(e)); last = gestureState(); });
+stage.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, localXY(e));
+  const g = gestureState(); if (!g || !last) { last = g; return; }
+  cx += g.mx - last.mx; cy += g.my - last.my;
+  if (g.d && last.d) zoomAbout(zoom * g.d / last.d, g.mx, g.my); else clampCenter();
+  last = g;
+});
+const endPt = e => { pts.delete(e.pointerId); last = gestureState(); };
+stage.addEventListener("pointerup", endPt); stage.addEventListener("pointercancel", endPt);
+stage.addEventListener("wheel", e => { e.preventDefault(); anim = null; const [x, y] = localXY(e); zoomAbout(zoom * Math.exp(-e.deltaY * 0.0025), x, y); }, { passive: false });
+["gesturestart","gesturechange","gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+stage.addEventListener("touchmove", e => { if (!e.target.closest(".tbar")) e.preventDefault(); }, { passive: false });
+
+// ---------- Animated zoom (buttons) ----------
+let anim = null, lastZoomSecs = 0, zoomShownUntil = 0;
+let zoomSecs = 5;   // seconds for Earth to go from true size to filling the view
+try { const z = parseFloat(localStorage.getItem("zoomSecs")); if (z >= 0.5 && z <= 600) zoomSecs = z; } catch (e) {}
+function animateTo(targetZoom) {
+  autoFit = false;
+  targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
+  const tx = view().x, ty = homeY();
+  if (reduceMotion) { zoom = targetZoom; cx = tx; cy = ty; return; }
+  // Constant zoom speed: going from Earth at true size to Earth filling the view takes zoomSecs seconds (default 5),
+  // so the time any zoom takes shows how big the size difference is.
+  const earthFit = view().fit / (12742 * IN_PER_KM * ppi);
+  const rate = Math.abs(Math.log(earthFit)) / (zoomSecs * 1000); // log-zoom units per ms
+  const zoomMs = Math.abs(Math.log(targetZoom / zoom)) / rate;
+  const dur = Math.max(zoomMs, 400);                             // short glide if only re-centering
+  anim = { t0: performance.now(), dur, zoomMs, z0: Math.log(zoom), z1: Math.log(targetZoom), x0: cx, y0: cy, x1: tx, y1: ty };
+}
+function fitZoom() {
+  const base = extentCss() / zoom;
+  animateTo(view().fit / base);
+}
+document.getElementById("btnFill").addEventListener("click", fitZoom);
+document.getElementById("btnTrue").addEventListener("click", () => animateTo(1));
+
+// ---------- Selection + static readouts ----------
+function selectObject(o) {
+  obj = o; zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
+  document.querySelectorAll(".chip, .tchip").forEach(c => c.setAttribute("aria-pressed", c.dataset.id === o.id));
+  closeDrop();
+  const tc = document.getElementById("tchip-" + o.id);
+  tSel.querySelector("i").outerHTML = tc.querySelector("i").outerHTML;
+  document.getElementById("tSelName").textContent = o.short || o.name;
+  const pick = document.getElementById((theater() ? "tchip-" : "chip-") + o.id);
+  pick.scrollIntoView({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  // start out zoomed out if the object is bigger than the viewing area at true size
+  autoFit = true; refit();
+  drawBackground();
+  refreshStatic();
+}
+function refreshStatic() {
+  const o = obj;
+  document.getElementById("pName").textContent = o.name;
+  const km = mainKm(), din = km * IN_PER_KM;
+  const like = likeText(din * 25.4);
+  document.getElementById("pLike").innerHTML = (o.group ? "4 largest, side by side.<br>Ceres is " : like.q.replace(/^./, c => c.toUpperCase()) + "<br>") +
+    (o.group ? like.q + " <b>" + like.what + "</b>" : "<b>" + like.what + "</b>");
+  document.getElementById("kModel").textContent = o.group ? "Ceres model diameter" : "Model diameter";
+  document.getElementById("kReal").textContent = o.group ? "Real diameters" : "Real diameter";
+  document.getElementById("sModel").innerHTML = fmtLen(din) + " <small>(" + fmtMm(din * 25.4) + ")</small>";
+  renderDist();
+  document.getElementById("sReal").innerHTML = o.group
+    ? o.members.map(m => m.km).join(" / ") + " km"
+    : o.km.toLocaleString() + " km <small>(" + Math.round(o.km * 0.621371).toLocaleString() + " mi)</small>";
+  const kmPerIn = 1 / IN_PER_KM;
+  document.getElementById("credit").innerHTML =
+    "Scale: Pluto's orbit (39.5 AU) = " + fmtScale() + ", so 1 inch = " + Math.round(kmPerIn).toLocaleString() + " km. " +
+    (o.group ? "Asteroids are placed side by side to compare. In the model they are many feet apart; shapes are approximate. " : "") +
+    "Travel times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
+    'Surface maps: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0.';
+  for (const k in cache) delete cache[k];
+}
+
+// ---------- Distance between two objects ----------
+// Orbits treated as circles: closest when lined up on the same side of the Sun, farthest on opposite sides.
+let distRefId = "sun";
+const distSel = document.getElementById("distRef"), distRefLabel = document.getElementById("distRefLabel");
+const MOON_AU = 384400 / AU_KM;   // average Earth-Moon distance
+const auSpan = o => o.sun ? [0, 0] : o.id === "moon" ? [1 - MOON_AU, 1 + MOON_AU] : [o.au, o.au];
+function renderDist() {
+  if (distRefId === obj.id) distRefId = obj.id === "sun" ? "earth" : "sun";
+  const ref = OBJECTS.find(o => o.id === distRefId);
+  distSel.innerHTML = OBJECTS.filter(o => o.id !== obj.id)
+    .map(o => `<option value="${o.id}"${o.id === distRefId ? " selected" : ""}>${o.name}</option>`).join("");
+  distRefLabel.textContent = ref.name;
+  const A = auSpan(obj), B = auSpan(ref);
+  let lo, hi, note;
+  const ids = [obj.id, ref.id].sort().join();
+  if (ids === "earth,moon") {
+    lo = 363300 / AU_KM; hi = 405500 / AU_KM; note = "closest to farthest";
+  } else if (obj.sun || ref.sun) {
+    const r = obj.sun ? B : A; lo = r[0]; hi = r[1];
+    note = lo === hi ? "" : "closest to farthest";
+  } else {
+    lo = Math.max(0, Math.max(A[0], B[0]) - Math.min(A[1], B[1])); hi = A[1] + B[1];
+    note = "closest to farthest";
+  }
+  const el = document.getElementById("sDist");
+  const trip = lo === hi ? fmtTrip(lo) : lo === 0 ? "up to " + fmtTrip(hi) : fmtTrip(lo, true) + " to " + fmtTrip(hi);
+  el.innerHTML = (lo === hi ? fmtFt(lo * FT_PER_AU)
+    : (lo === 0 ? "0" : fmtFt(lo * FT_PER_AU)) + " to " + fmtFt(hi * FT_PER_AU) + "<br><small>" + note + "" + "</small>")
+    + '<div class="trip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l3-3m6-11c3 0 5 2 5 5 0 3-3 7-7 9l-5-5c2-4 5-9 7-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="14" cy="10" r="1.6" fill="currentColor"/></svg>' + trip + '</div>';
+}
+distSel.addEventListener("change", () => { distRefId = distSel.value; renderDist(); });
+
+// Travel time at the speed SpaceX Starship has actually flown: above 25,700 km/h (about 16,000 mph), June 2024 test flight
+const PROBE_KMH = 25700;
+function fmtTrip(au, bare) {
+  const h = au * AU_KM / PROBE_KMH;
+  let n, u;
+  if (h < 48) { n = h < 10 ? h.toFixed(1) : Math.round(h); u = "hours"; }
+  else if (h < 24 * 60) { const d = h / 24; n = d < 10 ? d.toFixed(1) : Math.round(d); u = "days"; }
+  else if (h < 24 * 730) { const m = h / 730.5; n = m < 10 ? m.toFixed(1) : Math.round(m); u = "months"; }
+  else { n = (h / 8766).toFixed(1); u = "years"; }
+  return bare ? String(n) + " " + u : n + " " + u;
+}
+
+// ---------- Formatting ----------
+function sig(x, n) { if (x === 0) return "0"; const d = Math.max(0, n - 1 - Math.floor(Math.log10(Math.abs(x)))); return x.toFixed(Math.min(d, 8)); }
+function fmtMm(x) { return x < 0.1 ? sig(x * 1000, 2) + " µm" : sig(x, 2) + " mm"; }
+function fmtFt(ft) {
+  if (ft < 1) return sig(ft * 12, 2) + " in";
+  if (ft < 5280) return (ft < 100 ? sig(ft, 3) : Math.round(ft).toLocaleString()) + " ft";
+  return sig(ft / 5280, 3) + " mi";
+}
+function fmtLen(inches) { return inches < 12 ? sig(inches, 3) + " in" : fmtFt(inches / 12); }
+function fmtZoom(z) { return X + (z < 0.1 ? z.toFixed(3) : z < 10 ? z.toFixed(2) : z < 100 ? z.toFixed(1) : Math.round(z).toLocaleString()); }
+function fmtScale() {
+  const v = scaleFt / UNIT_FT[scaleUnit];
+  const names = { ft: "ft", mi: v === 1 ? "mile" : "miles", m: "m", km: "km" };
+  return (+sig(v, 4)).toLocaleString() + " " + names[scaleUnit];
+}
+function scaleWord() {
+  const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
+  const names = { ft: "Foot", mi: "Mile", m: "Meter", km: "Kilometer" };
+  return v.toLocaleString() + "-" + names[scaleUnit];
+}
+
+// ---------- Meter ticks ----------
+const ticksEl = document.getElementById("ticks");
+const METER_MAX = MAX_ZOOM;
+[1, 10, 100, 1e3, 1e4, 1e5, 1e6].forEach(v => {
+  const s = document.createElement("span"); s.className = "tick";
+  s.style.left = (Math.log(v) / Math.log(METER_MAX) * 100) + "%";
+  s.textContent = v >= 1e6 ? "1M" + X : v >= 1e3 ? (v / 1e3) + "k" + X : v + X;
+  ticksEl.appendChild(s);
+});
+const meterFill = document.getElementById("meterFill");
+const zoomVal = document.getElementById("zoomVal"), zoomLab = document.getElementById("zoomLab");
+const tInfo = document.getElementById("tInfo");
+const equiv = document.getElementById("equiv"), sScreen = document.getElementById("sScreen"), hint = document.getElementById("hint");
+let hintDismissed = false;
+const cache = {};
+function setText(el, key, html) { if (cache[key] !== html) { cache[key] = html; el.innerHTML = html; } }
+
+// ---------- Overlay: reticle, labels, scale bar ----------
+let hudPadL = 16;
+const MONO = "500 11px 'IBM Plex Mono', ui-monospace, monospace";
+function drawOverlay(t) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, stageW, stageH);
+  ctx.font = MONO;
+  const ext = extentCss();
+  if (ext < 16) {
+    const pulse = reduceMotion ? 0 : (Math.sin(t / 380) + 1) * 2;
+    const h = Math.max(14, ext / 2 + 8) + pulse, arm = 6;
+    ctx.strokeStyle = "rgba(255,184,77,0.9)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const [sx, sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]) {
+      const x = cx + sx * h, y = cy + sy * h;
+      ctx.moveTo(x, y - sy * arm); ctx.lineTo(x, y); ctx.lineTo(x - sx * arm, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,184,77,0.95)"; ctx.textAlign = "center";
+    const label = (obj.group ? "Asteroids are" : obj.name + " is") + " here";
+    if (cy - h - 10 > 110) ctx.fillText(label, cx, cy - h - 8); else ctx.fillText(label, cx, cy + h + 16);
+  } else if (obj.group) {
+    const k = pxPerKm();
+    ctx.fillStyle = "rgba(236,239,246,0.85)"; ctx.textAlign = "center";
+    for (const b of bodiesOf(obj)) {
+      const x = cx + b.xKm * k, y = cy + b.radKm * k * b.ax[1] + 16;
+      if (x > -40 && x < stageW + 40) ctx.fillText(b.name, x, Math.min(y, stageH - 40));
+    }
+  }
+  // companion (Moon next to Earth, or Earth next to the Moon)
+  for (const b of bodiesOf(obj)) {
+    if (!b.companion) continue;
+    const k = pxPerKm(), sx = cx + b.xKm * k, sy = cy + b.yKm * k, r = b.radKm * k;
+    const sep = Math.hypot(sx - cx, sy - cy);
+    if (sep < 26) continue;
+    ctx.fillStyle = "rgba(200,206,222,0.85)"; ctx.strokeStyle = "rgba(200,206,222,0.55)"; ctx.lineWidth = 1;
+    const m = 18, top = 100, bot = stageH - 46;
+    if (sx > m && sx < stageW - m && sy > top && sy < bot) {
+      if (r < 8) { ctx.beginPath(); ctx.arc(sx, sy, Math.max(9, r + 6), 0, Math.PI * 2); ctx.stroke(); }
+      ctx.textAlign = "center"; ctx.fillText(b.name, sx, sy + Math.max(r, 9) + 15);
+    } else {
+      // off screen: arrow at the edge pointing toward it
+      const dx = (sx - cx) / sep, dy = (sy - cy) / sep;
+      let tt = Infinity;
+      if (dx > 0) tt = Math.min(tt, (stageW - m - cx) / dx); if (dx < 0) tt = Math.min(tt, (m - cx) / dx);
+      if (dy > 0) tt = Math.min(tt, (bot - cy) / dy); if (dy < 0) tt = Math.min(tt, (top - cy) / dy);
+      const ex = cx + dx * tt, ey = cy + dy * tt;
+      ctx.save(); ctx.translate(ex, ey); ctx.rotate(Math.atan2(dy, dx));
+      ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, -5); ctx.lineTo(-4, 5); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.textAlign = dx > 0.3 ? "right" : dx < -0.3 ? "left" : "center";
+      ctx.fillText(b.name + " " + fmtLen(sep / ppi) + " away", ex - dx * 12, ey - dy * 12 + (dy > 0.3 ? -6 : 14));
+    }
+  }
+  // 1 cm scale bar: always one real centimeter on this screen; the label says how many real miles it spans
+  const len = ppi / 2.54;
+  const miles = (1 / 2.54) / zoom / IN_PER_KM * 0.621371;
+  const x0 = Math.max(16, hudPadL), y0 = scaleY || stageH - 22;
+  ctx.strokeStyle = "rgba(236,239,246,0.85)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x0, y0 - 5); ctx.lineTo(x0, y0); ctx.lineTo(x0 + len, y0); ctx.lineTo(x0 + len, y0 - 5); ctx.stroke();
+  ctx.fillStyle = "rgba(236,239,246,0.9)"; ctx.textAlign = "left";
+  const mi = miles >= 100 ? Math.round(miles).toLocaleString() : sig(miles, 3);
+  ctx.fillText("1 cm = " + mi + (miles === 1 ? " mile" : " miles"), x0, y0 - 9);
+}
+
+// ---------- Frame loop ----------
+const t0 = performance.now();
+function frame(now) {
+  if (anim) {
+    const k = Math.min(1, (now - anim.t0) / anim.dur);       // linear: constant rate
+    zoom = Math.exp(anim.z0 + (anim.z1 - anim.z0) * k);
+    cx = anim.x0 + (anim.x1 - anim.x0) * k; cy = anim.y0 + (anim.y1 - anim.y0) * k;
+    lastZoomSecs = Math.min(now - anim.t0, anim.zoomMs) / 1000;
+    zoomShownUntil = now + 2500;
+    if (k >= 1) anim = null;
+  }
+  gl.viewport(0, 0, glc.width, glc.height);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.SCISSOR_TEST);
+  const kpx = pxPerKm() * dpr;   // device px per km
+  for (const b of bodiesOf(obj)) {
+    const tx = tex[b.texName];
+    if (!tx || (b.ring && !ringTex)) continue;
+    const R = b.radKm * kpx;                       // equatorial radius in device pixels
+    // Rule: a body narrower than one screen pixel lights nothing. Below that the screen stays black.
+    if (2 * R * Math.min(b.ax[0], b.ax[1]) < 1) continue;
+    const pcx = (cx + b.xKm * pxPerKm()) * dpr, pcy = (stageH - (cy + b.yKm * pxPerKm())) * dpr;
+    const reach = R * (b.ring ? RING_OUT : b.sun ? 1.5 : 1) + 2;
+    const x0 = Math.max(0, Math.floor(pcx - reach)), y0 = Math.max(0, Math.floor(pcy - reach));
+    const x1 = Math.min(glc.width, Math.ceil(pcx + reach)), y1 = Math.min(glc.height, Math.ceil(pcy + reach));
+    if (x1 <= x0 || y1 <= y0) continue;
+    gl.scissor(x0, y0, x1 - x0, y1 - y0);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tx);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ringTex);
+    gl.uniform2f(U.uC, pcx, pcy);
+    gl.uniform1f(U.uR, R);
+    gl.uniform3fv(U.uAx, b.ax);
+    gl.uniformMatrix3fv(U.uM, false, b.M);
+    // spin: 1 real hour = 1.65 s on screen
+    gl.uniform1f(U.uRot, reduceMotion ? 0 : ((now - t0) / 1000) / (b.dayH * 1.65) * Math.PI * 2);
+    gl.uniform1f(U.uOff, b.off);
+    gl.uniform3fv(U.uTint, b.tint);
+    gl.uniform1f(U.uHasRing, b.ring ? 1 : 0);
+    gl.uniform1f(U.uSun, b.sun ? 1 : 0);
+    gl.uniform1f(U.uLimb, b.limb); gl.uniform1f(U.uAtmo, b.atmo); gl.uniform3fv(U.uAtmoCol, b.atmoCol);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  drawOverlay(now);
+
+  // live readouts
+  meterFill.style.width = Math.max(0, Math.log(zoom) / Math.log(METER_MAX) * 100) + "%";
+  setText(zoomVal, "z", fmtZoom(zoom));
+  setText(zoomLab, "zl", (anim || now < zoomShownUntil) && lastZoomSecs > 0.05
+    ? (anim ? "zooming \u00b7 " : "zoom took ") + lastZoomSecs.toFixed(1) + " s"
+    : Math.abs(zoom - 1) < 0.005 ? "true model size" : zoom < 1 ? "zoomed out" : "magnification");
+  const screenIn = stageW / ppi;
+  setText(equiv, "eq", Math.abs(zoom - 1) < 0.005
+    ? "Your screen shows <b>" + fmtLen(screenIn) + "</b> of the model across. Pinch out to magnify."
+    : zoom < 1
+      ? "Your screen now shows <b>" + fmtLen(screenIn / zoom) + "</b> of the model across."
+      : "Like a phone <b>" + fmtLen(screenIn * zoom) + "</b> wide, showing <b>" + fmtLen(screenIn / zoom) + "</b> of model");
+  const dCss = mainDiamCss(), dPx = dCss * dpr;
+  const lit = dPx >= 1;
+  sScreen.classList.toggle("off", !lit);
+  setText(sScreen, "ss", lit
+    ? fmtLen(dCss / ppi) + " <small>" + (dPx < 1000 ? sig(dPx, 2) : Math.round(dPx).toLocaleString()) + " px</small>"
+    : sig(dPx, 2) + " px <small>too small, not drawn</small>");
+  if (theater()) setText(tInfo, "ti", "<b>" + obj.name + "</b> \u00b7 " + (obj.group ? "Ceres " : "") + fmtLen(mainKm() * IN_PER_KM) + " model \u00b7 on screen <em>" +
+    (lit ? fmtLen(dCss / ppi) : "under 1 px") + "</em>");
+  const showHint = !hintDismissed && dPx < 60;
+  hint.hidden = !showHint;
+  if (showHint) setText(hint, "h", !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
+  requestAnimationFrame(frame);
+}
+
+// ---------- Full-screen viewing mode ----------
+let inFs = false;
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function enterTheater() {
+  const keep = { z: zoom };
+  app.classList.add("theater");
+  const el = document.documentElement, rf = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (rf) {
+    try {
+      const pr = rf.call(el);
+      if (pr && pr.catch) pr.catch(() => {});
+    } catch (e) {}
+  }
+  requestAnimationFrame(() => { resize(); if (autoFit) refit(); else { zoom = keep.z; cx = view().x; cy = homeY(); } clampCenter(); });
+}
+function exitTheater() {
+  closeDrop();
+  if (!theater()) return;
+  app.classList.remove("theater");
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+  if (fsEl()) { const ex = document.exitFullscreen || document.webkitExitFullscreen; try { const pr = ex.call(document); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
+  requestAnimationFrame(() => { resize(); if (autoFit) refit(); else { cx = view().x; cy = homeY(); } clampCenter(); });
+}
+["fullscreenchange", "webkitfullscreenchange"].forEach(t => document.addEventListener(t, () => {
+  if (fsEl()) inFs = true; else if (inFs) { inFs = false; exitTheater(); }
+}));
+document.getElementById("fsBtn").addEventListener("click", enterTheater);
+document.getElementById("fsExit").addEventListener("click", exitTheater);
+document.getElementById("tTrue").addEventListener("click", () => animateTo(1));
+document.getElementById("tFill").addEventListener("click", fitZoom);
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!tPicker.hidden) closeDrop(); else exitTheater(); } });
+tSel.addEventListener("click", () => { if (tPicker.hidden) openDrop(); else closeDrop(); });
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".tdrop")) closeDrop(); });
+document.querySelectorAll(".tbar, #fsBtn").forEach(el => el.addEventListener("pointerdown", e => { if (!e.target.closest(".tdrop")) closeDrop(); e.stopPropagation(); }));
+
+// ---------- Scale sheet ----------
+const scaleSheet = document.getElementById("scaleSheet"), scaleInput = document.getElementById("scaleInput"), scaleUnitSel = document.getElementById("scaleUnit");
+const scalePreview = document.getElementById("scalePreview");
+const PRESETS = [[100,"ft"],[300,"ft","a football field"],[500,"ft"],[1,"mi"],[5,"mi"],[1,"km"]];
+const presetsEl = document.getElementById("presets");
+PRESETS.forEach(([v, u, note]) => {
+  const b = document.createElement("button"); b.type = "button"; b.className = "preset";
+  b.textContent = v + " " + (u === "mi" ? (v === 1 ? "mile" : "miles") : u) + (note ? " (" + note + ")" : "");
+  b.addEventListener("click", () => { scaleInput.value = v; scaleUnitSel.value = u; updatePreview(); });
+  presetsEl.appendChild(b);
+});
+const speedInput = document.getElementById("speedInput"), speedPresets = document.getElementById("speedPresets");
+[2, 5, 10, 20, 30].forEach(v => {
+  const b = document.createElement("button"); b.type = "button"; b.className = "preset";
+  b.textContent = v + " s" + (v === 5 ? " (default)" : "");
+  b.addEventListener("click", () => { speedInput.value = v; });
+  speedPresets.appendChild(b);
+});
+function pendingFt() { const v = parseFloat(scaleInput.value); return v > 0 ? v * UNIT_FT[scaleUnitSel.value] : NaN; }
+function updatePreview() {
+  const ft = pendingFt();
+  if (!(ft > 0)) { scalePreview.textContent = "Enter a distance greater than zero."; return; }
+  const inPerKm = ft * 12 / (PLUTO_AU * AU_KM);
+  const sun = 1392700 * inPerKm, earth = 12742 * inPerKm;
+  scalePreview.innerHTML = "Sun <b>" + fmtLen(sun) + "</b> wide, Earth <b>" + fmtLen(earth) + "</b> wide and <b>" + fmtFt(ft / PLUTO_AU) + "</b> from the Sun.";
+}
+document.getElementById("scaleBtn").addEventListener("click", () => {
+  scaleInput.value = +sig(scaleFt / UNIT_FT[scaleUnit], 6); scaleUnitSel.value = scaleUnit; speedInput.value = zoomSecs; updatePreview(); scaleSheet.hidden = false;
+});
+scaleInput.addEventListener("input", updatePreview); scaleUnitSel.addEventListener("change", updatePreview);
+document.getElementById("scaleCancel").addEventListener("click", () => { scaleSheet.hidden = true; });
+document.getElementById("scaleForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const ft = pendingFt(); if (!(ft > 0)) return;
+  const secs = parseFloat(speedInput.value);
+  if (secs >= 0.5 && secs <= 600) {
+    zoomSecs = secs;
+    try { localStorage.setItem("zoomSecs", String(secs)); } catch (err) {}
+  }
+  scaleFt = ft; scaleUnit = scaleUnitSel.value; applyScale();
+  try { localStorage.setItem("scale", JSON.stringify({ ft: scaleFt, unit: scaleUnit })); } catch (err) {}
+  document.getElementById("scaleBtn").setAttribute("aria-label", "Model settings: " + scaleWord() + " scale");
+  scaleInput.blur(); scaleSheet.hidden = true;
+  selectObject(obj);
+});
+
+// ---------- Calibration sheet ----------
+const calib = document.getElementById("calib"), slider = document.getElementById("ppiSlider"), cardBox = document.getElementById("cardBox");
+function drawCard() { cardBox.style.width = (2.125 * ppi) + "px"; cardBox.style.height = (1.1 * ppi) + "px"; }
+deviceBtn.addEventListener("click", () => { slider.value = ppi; drawCard(); calib.hidden = false; });
+slider.addEventListener("input", () => { ppi = parseFloat(slider.value); calibrated = true; drawCard(); });
+document.getElementById("calibReset").addEventListener("click", () => { ppi = IPHONE15_CSS_PPI; calibrated = false; slider.value = ppi; drawCard(); try { localStorage.removeItem("ppi"); } catch (e) {} });
+document.getElementById("calibDone").addEventListener("click", () => {
+  calib.hidden = true; updateDeviceLabel();
+  try { if (calibrated) localStorage.setItem("ppi", String(ppi)); } catch (e) {}
+  refreshStatic();
+});
+
+document.getElementById("scaleBtn").setAttribute("aria-label", "Model settings: " + scaleWord() + " scale");
+resize();
+selectObject(obj);
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
