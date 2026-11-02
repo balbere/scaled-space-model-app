@@ -355,10 +355,7 @@ const OBJECTS = [
   { id:"moon",    name:"Moon",    tex:"moon", km:3474.8, au:1.000, dayH:655.7, obl:1.5, view:6, swatch:"#a9a8a4", limb:0.0, atmo:0, off:0.5 },
   { id:"mars",    name:"Mars",    tex:"mars", km:6779,   au:1.524, dayH:24.62,  obl:25.2, view:12, swatch:"#c2643a", limb:0.0, atmo:0.15, atmoCol:[1,0.75,0.6] },
   { id:"belt", name:"Asteroid belt", short:"Asteroids", group:true, au:2.7, members:[
-      { name:"Ceres",  tex:"asteroid", km:939, dims:[964, 892, 964], dayH:9.07,  obl:4,  view:10, tint:[0.42,0.42,0.43], off:0.1 },
-      { name:"Vesta",  tex:"asteroid", km:525, dims:[573, 446, 557], dayH:5.34,  obl:29, view:10, tint:[0.80,0.75,0.68], off:0.4 },
-      { name:"Pallas", tex:"asteroid", km:512, dims:[568, 448, 532], dayH:7.81,  obl:84, view:10, tint:[0.58,0.60,0.63], off:0.65 },
-      { name:"Hygiea", tex:"asteroid", km:434, dims:[450, 424, 430], dayH:13.8,  obl:60, view:10, tint:[0.33,0.32,0.31], off:0.85 } ] },
+      { name:"Ceres",  tex:"asteroid", km:939, dims:[964, 892, 964], dayH:9.07,  obl:4,  view:10, tint:[0.42,0.42,0.43], off:0.1 } ] },
   { id:"jupiter", name:"Jupiter", tex:"jupiter", km:139820, au:5.203, dayH:9.93,   obl:3.1,  view:8,  swatch:"#c9a27a", limb:0.45, atmo:0 },
   { id:"saturn",  name:"Saturn",  tex:"saturn", km:116460, au:9.537, dayH:10.66,  obl:26.7, view:22, swatch:"#dcc596", limb:0.4, atmo:0, ring:true },
   { id:"uranus",  name:"Uranus",  tex:"uranus", km:50724,  au:19.19, dayH:-17.24, obl:97.8, view:10, swatch:"#a6dbe2", limb:0.45, atmo:0.2, atmoCol:[0.75,0.95,1] },
@@ -787,19 +784,19 @@ function refreshStatic() {
   document.getElementById("pName").textContent = o.name;
   const km = mainKm(), din = km * IN_PER_KM;
   const like = likeText(din * 25.4);
-  document.getElementById("pLike").innerHTML = (o.group ? "4 largest, side by side. Ceres is " : like.q.replace(/^./, c => c.toUpperCase()) + " ") +
+  document.getElementById("pLike").innerHTML = (o.group ? "Its largest asteroid, Ceres, is " : like.q.replace(/^./, c => c.toUpperCase()) + " ") +
     (o.group ? like.q + " <b>" + like.what + "</b>" : "<b>" + like.what + "</b>");
   document.getElementById("kModel").textContent = o.group ? "Ceres model diameter" : "Model diameter";
-  document.getElementById("kReal").textContent = o.group ? "Real diameters" : "Real diameter";
+  document.getElementById("kReal").textContent = o.group ? "Ceres real diameter" : "Real diameter";
   document.getElementById("sModel").innerHTML = fmtLen(din) + " <small>(" + fmtMm(din * 25.4) + ")</small>";
   renderDist();
   document.getElementById("sReal").innerHTML = o.group
-    ? o.members.map(m => m.km).join(" / ") + " km"
+    ? o.members[0].km.toLocaleString() + " km <small>(" + Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi)</small>"
     : o.km.toLocaleString() + " km <small>(" + Math.round(o.km * 0.621371).toLocaleString() + " mi)</small>";
   const kmPerIn = 1 / IN_PER_KM;
   document.getElementById("credit").innerHTML =
     "Scale: Pluto's orbit (39.5 AU) = " + fmtScale() + ", so 1 inch = " + Math.round(kmPerIn).toLocaleString() + " km. " +
-    (o.group ? "Asteroids are placed side by side to compare. In the model they are many feet apart; shapes are approximate. " : "") +
+    (o.group ? "The asteroid belt is shown by its largest member, Ceres; its surface is approximate. " : "") +
     "Travel times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
     'Surface maps: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0.';
   for (const k in cache) delete cache[k];
@@ -906,7 +903,7 @@ function drawOverlay(t) {
     }
     ctx.stroke();
     ctx.fillStyle = "rgba(255,184,77,0.95)"; ctx.textAlign = "center";
-    const label = (obj.group ? "Asteroids are" : obj.name + " is") + " here";
+    const label = (obj.group ? "Ceres is" : obj.name + " is") + " here";
     if (cy - h - 10 > 110) ctx.fillText(label, cx, cy - h - 8); else ctx.fillText(label, cx, cy + h + 16);
   } else if (obj.group) {
     const k = pxPerKm();
