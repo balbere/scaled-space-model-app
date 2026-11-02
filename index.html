@@ -132,15 +132,15 @@ h1 { margin: 0; min-width: 0; }
 .credit a { color: var(--muted); }
 
 .sheet { position: absolute; inset: 0; background: rgba(0,0,0,.72); display: grid; place-items: end center; z-index: 5; }
-.sheet .card { width: 100%; max-width: 520px; box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding-block: 18px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+.sheet .card { width: 100%; max-width: 520px; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding-block: 18px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
 .sheet h2 { font-family: var(--font-display); font-weight: 500; font-size: 17px; margin: 0; }
 .sheet p { margin: 0; color: var(--muted); line-height: 1.45; max-width: 60ch; }
 .cardbox { height: 0; border: 2px solid var(--sun); border-bottom: 0; border-radius: 10px 10px 0 0; box-sizing: border-box; max-width: 100%; }
 .sheet input[type=range] { width: 100%; accent-color: var(--sun); }
 .sheet .row { display: flex; gap: 8px; }
 .field { display: flex; align-items: center; gap: 8px; }
-.field input { flex: 1 1 auto; min-width: 0; font: 500 22px var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.field select { font: 500 15px var(--font-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 10px; }
+.field input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; font: 500 22px var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.field select { flex: 0 0 auto; font: 500 16px var(--font-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 10px; }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset { font: 500 12.5px var(--font-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
 .sheet .card { max-height: 100%; overflow-y: auto; }
