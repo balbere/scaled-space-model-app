@@ -798,8 +798,7 @@ function refreshStatic() {
   document.getElementById("pName").textContent = o.name;
   const km = mainKm(), din = km * IN_PER_KM;
   const like = likeText(din * 25.4);
-  document.getElementById("pLike").innerHTML = (o.group ? "Its largest asteroid, Ceres, is " : like.q.replace(/^./, c => c.toUpperCase()) + " ") +
-    (o.group ? like.q + " <b>" + like.what + "</b>" : "<b>" + like.what + "</b>");
+  document.getElementById("pLike").innerHTML = like.q.replace(/^./, c => c.toUpperCase()) + " <b>" + like.what + "</b>";
   document.getElementById("kModel").textContent = o.group ? "Ceres model diameter" : "Model diameter";
   document.getElementById("kReal").textContent = o.group ? "Ceres real diameter" : "Real diameter";
   document.getElementById("sModel").innerHTML = fmtLen(din);
