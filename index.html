@@ -1049,7 +1049,7 @@ function frame(now) {
     : Math.abs(zoom - 1) < 0.005 ? "true model size" : zoom < 1 ? "zoomed out" : "magnification");
   const screenIn = stageW / ppi;
   setText(equiv, "eq", Math.abs(zoom - 1) < 0.005
-    ? "Your screen shows <b>" + fmtLen(screenIn) + "</b> of the model across. Pinch out to magnify."
+    ? "Your screen shows <b>" + fmtLen(screenIn) + "</b> of the model across."
     : zoom < 1
       ? "Your screen now shows <b>" + fmtLen(screenIn / zoom) + "</b> of the model across."
       : "Like a phone <b>" + fmtLen(screenIn * zoom) + "</b> wide, showing <b>" + fmtLen(screenIn / zoom) + "</b> of model");
