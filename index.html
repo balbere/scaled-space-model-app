@@ -288,8 +288,7 @@ h1 { margin: 0; min-width: 0; }
         <select id="scaleUnit" aria-label="Unit">
           <option value="ft">feet</option>
           <option value="mi">miles</option>
-          <option value="m">meters</option>
-          <option value="km">km</option>
+          <option value="yd">yards</option>
         </select>
       </div>
       <div class="presets" id="presets"></div>
@@ -331,12 +330,12 @@ const AU_KM = 149597870.7;
 const PLUTO_AU = 39.5;
 const IPHONE15_CSS_PPI = 460 / 3;          // 460 physical ppi at 3x = 153.33 CSS px per inch
 const MIN_ZOOM = 0.01, MAX_ZOOM = 1e6;
-const UNIT_FT = { ft: 1, mi: 5280, m: 3.28084, km: 3280.84 };
+const UNIT_FT = { ft: 1, yd: 3, mi: 5280 };
 
 let scaleFt = 500, scaleUnit = "ft";
 try {
   const s = JSON.parse(localStorage.getItem("scale") || "null");
-  if (s && s.ft > 0 && UNIT_FT[s.unit]) { scaleFt = s.ft; scaleUnit = s.unit; }
+  if (s && s.ft > 0) { scaleFt = s.ft; scaleUnit = UNIT_FT[s.unit] ? s.unit : s.ft >= 5280 ? "mi" : "ft"; }  // older metric choices become feet or miles
 } catch (e) {}
 let IN_PER_KM, FT_PER_AU;
 function applyScale() {
@@ -788,14 +787,14 @@ function refreshStatic() {
     (o.group ? like.q + " <b>" + like.what + "</b>" : "<b>" + like.what + "</b>");
   document.getElementById("kModel").textContent = o.group ? "Ceres model diameter" : "Model diameter";
   document.getElementById("kReal").textContent = o.group ? "Ceres real diameter" : "Real diameter";
-  document.getElementById("sModel").innerHTML = fmtLen(din) + " <small>(" + fmtMm(din * 25.4) + ")</small>";
+  document.getElementById("sModel").innerHTML = fmtLen(din);
   renderDist();
   document.getElementById("sReal").innerHTML = o.group
-    ? o.members[0].km.toLocaleString() + " km <small>(" + Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi)</small>"
-    : o.km.toLocaleString() + " km <small>(" + Math.round(o.km * 0.621371).toLocaleString() + " mi)</small>";
+    ? Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi"
+    : Math.round(o.km * 0.621371).toLocaleString() + " mi";
   const kmPerIn = 1 / IN_PER_KM;
   document.getElementById("credit").innerHTML =
-    "Scale: Pluto's orbit (39.5 AU) = " + fmtScale() + ", so 1 inch = " + Math.round(kmPerIn).toLocaleString() + " km. " +
+    "Scale: Pluto's orbit (39.5 AU) = " + fmtScale() + ", so 1 inch = " + Math.round(kmPerIn * 0.621371).toLocaleString() + " miles. " +
     (o.group ? "The asteroid belt is shown by its largest member, Ceres; its surface is approximate. " : "") +
     "Travel times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
     'Surface maps: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0.';
@@ -849,7 +848,6 @@ function fmtTrip(au, bare) {
 
 // ---------- Formatting ----------
 function sig(x, n) { if (x === 0) return "0"; const d = Math.max(0, n - 1 - Math.floor(Math.log10(Math.abs(x)))); return x.toFixed(Math.min(d, 8)); }
-function fmtMm(x) { return x < 0.1 ? sig(x * 1000, 2) + " µm" : sig(x, 2) + " mm"; }
 function fmtFt(ft) {
   if (ft < 1) return sig(ft * 12, 2) + " in";
   if (ft < 5280) return (ft < 100 ? sig(ft, 3) : Math.round(ft).toLocaleString()) + " ft";
@@ -859,12 +857,12 @@ function fmtLen(inches) { return inches < 12 ? sig(inches, 3) + " in" : fmtFt(in
 function fmtZoom(z) { return X + (z < 0.1 ? z.toFixed(3) : z < 10 ? z.toFixed(2) : z < 100 ? z.toFixed(1) : Math.round(z).toLocaleString()); }
 function fmtScale() {
   const v = scaleFt / UNIT_FT[scaleUnit];
-  const names = { ft: "ft", mi: v === 1 ? "mile" : "miles", m: "m", km: "km" };
+  const names = { ft: "ft", yd: v === 1 ? "yard" : "yards", mi: v === 1 ? "mile" : "miles" };
   return (+sig(v, 4)).toLocaleString() + " " + names[scaleUnit];
 }
 function scaleWord() {
   const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
-  const names = { ft: "Foot", mi: "Mile", m: "Meter", km: "Kilometer" };
+  const names = { ft: "Foot", yd: "Yard", mi: "Mile" };
   return v.toLocaleString() + "-" + names[scaleUnit];
 }
 
@@ -938,15 +936,15 @@ function drawOverlay(t) {
       ctx.fillText(b.name + " " + fmtLen(sep / ppi) + " away", ex - dx * 12, ey - dy * 12 + (dy > 0.3 ? -6 : 14));
     }
   }
-  // 1 cm scale bar: always one real centimeter on this screen; the label says how many real miles it spans
-  const len = ppi / 2.54;
-  const miles = (1 / 2.54) / zoom / IN_PER_KM * 0.621371;
+  // 1-inch scale bar: always one real inch on this screen; the label says how many real miles it spans
+  const len = ppi;
+  const miles = 1 / zoom / IN_PER_KM * 0.621371;
   const x0 = Math.max(16, hudPadL), y0 = scaleY || stageH - 22;
   ctx.strokeStyle = "rgba(236,239,246,0.85)"; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x0, y0 - 5); ctx.lineTo(x0, y0); ctx.lineTo(x0 + len, y0); ctx.lineTo(x0 + len, y0 - 5); ctx.stroke();
   ctx.fillStyle = "rgba(236,239,246,0.9)"; ctx.textAlign = "left";
   const mi = miles >= 100 ? Math.round(miles).toLocaleString() : sig(miles, 3);
-  ctx.fillText("1 cm = " + mi + (miles === 1 ? " mile" : " miles"), x0, y0 - 9);
+  ctx.fillText("1 in = " + mi + (miles === 1 ? " mile" : " miles"), x0, y0 - 9);
 }
 
 // ---------- Frame loop ----------
@@ -1058,7 +1056,7 @@ document.querySelectorAll(".tbar, #fsBtn").forEach(el => el.addEventListener("po
 // ---------- Scale sheet ----------
 const scaleSheet = document.getElementById("scaleSheet"), scaleInput = document.getElementById("scaleInput"), scaleUnitSel = document.getElementById("scaleUnit");
 const scalePreview = document.getElementById("scalePreview");
-const PRESETS = [[100,"ft"],[300,"ft","a football field"],[500,"ft"],[1,"mi"],[5,"mi"],[1,"km"]];
+const PRESETS = [[100,"ft"],[100,"yd","a football field"],[500,"ft"],[1,"mi"],[5,"mi"],[10,"mi"]];
 const presetsEl = document.getElementById("presets");
 PRESETS.forEach(([v, u, note]) => {
   const b = document.createElement("button"); b.type = "button"; b.className = "preset";
