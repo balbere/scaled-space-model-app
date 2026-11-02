@@ -224,7 +224,7 @@ h1 { margin: 0; min-width: 0; }
         </button>
         <h1>Solar <span>System</span></h1>
       </div>
-      <button class="device" id="deviceBtn" type="button">iPhone 15 &middot; 460 ppi</button>
+      <button class="device" id="deviceBtn" type="button">Calibrate Screen</button>
     </div>
     <div class="chips" id="chips" role="toolbar" aria-label="Choose what to view"></div>
   </header>
@@ -413,9 +413,10 @@ let ppi = IPHONE15_CSS_PPI, calibrated = false;
 try { const s = parseFloat(localStorage.getItem("ppi")); if (s > 50 && s < 400) { ppi = s; calibrated = true; } } catch (e) {}
 const deviceBtn = document.getElementById("deviceBtn");
 function updateDeviceLabel() {
-  if (calibrated) deviceBtn.textContent = "Calibrated · " + (ppi * devicePixelRatio).toFixed(0) + " ppi";
-  else if (isIphone15Size()) deviceBtn.textContent = "iPhone 15 · 460 ppi";
-  else deviceBtn.textContent = "Not an iPhone 15? Calibrate";
+  // the label always reads "Calibrate Screen"; the current setting is described in the tooltip
+  deviceBtn.textContent = "Calibrate Screen";
+  deviceBtn.title = calibrated ? "Calibrated: " + (ppi * devicePixelRatio).toFixed(0) + " pixels per inch"
+    : isIphone15Size() ? "Using iPhone 15 screen size (460 pixels per inch)" : "Match the app to your screen with a credit card";
 }
 updateDeviceLabel();
 
