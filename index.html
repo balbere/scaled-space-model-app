@@ -126,8 +126,15 @@ h1 { margin: 0; min-width: 0; }
 .actions { display: flex; gap: 8px; }
 .btn { flex: 1 1 0; font: 600 13px var(--font-body); padding: 11px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer; }
 .btn.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
-.credit { font-size: 10px; color: var(--muted); line-height: 1.4; }
-.credit a { color: var(--muted); }
+.namebox { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.infobtn { width: 28px; height: 28px; margin: -4px 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--sun); cursor: pointer; }
+.infobtn svg { width: 19px; height: 19px; }
+.infobtn:hover, .infobtn:active { background: var(--panel-2); }
+.about { display: grid; gap: 12px; }
+.about h3 { font: 600 11px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 3px; }
+.about p { margin: 0; color: var(--ink); line-height: 1.5; max-width: 60ch; }
+.about b { color: var(--sun); font-weight: 600; }
+.about a { color: var(--sun); }
 
 .sheet { position: absolute; inset: 0; background: rgba(0,0,0,.72); display: grid; place-items: end center; z-index: 5; }
 .sheet .card { width: 100%; max-width: 520px; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding-block: 18px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
@@ -260,7 +267,12 @@ h1 { margin: 0; min-width: 0; }
 
   <section class="panel gutter">
     <div class="namerow">
-      <h2 class="pname" id="pName">Sun</h2>
+      <div class="namebox">
+        <h2 class="pname" id="pName">Sun</h2>
+        <button class="infobtn" id="aboutBtn" type="button" aria-label="About this model" title="About this model">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/></svg>
+        </button>
+      </div>
       <div class="like" id="pLike"></div>
     </div>
     <div class="stats">
@@ -273,7 +285,6 @@ h1 { margin: 0; min-width: 0; }
       <button class="btn" id="btnTrue" type="button">True size &times;1</button>
       <button class="btn primary" id="btnFill" type="button">Zoom to fill</button>
     </div>
-    <div class="credit" id="credit"></div>
   </section>
 
   <div class="sheet" id="scaleSheet" hidden>
@@ -303,6 +314,14 @@ h1 { margin: 0; min-width: 0; }
         <button class="btn primary" type="submit">Use this scale</button>
       </div>
     </form>
+  </div>
+
+  <div class="sheet" id="aboutSheet" hidden>
+    <div class="card gutter">
+      <h2>About this model</h2>
+      <div class="about" id="aboutBody"></div>
+      <div class="row"><button class="btn primary" id="aboutClose" type="button">Done</button></div>
+    </div>
   </div>
 
   <div class="sheet" id="calib" hidden>
@@ -791,11 +810,19 @@ function refreshStatic() {
     ? Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi"
     : Math.round(o.km * 0.621371).toLocaleString() + " mi";
   const kmPerIn = 1 / IN_PER_KM;
-  document.getElementById("credit").innerHTML =
-    "Scale: Pluto's orbit (39.5 AU) = " + fmtScale() + ", so 1 inch = " + Math.round(kmPerIn * 0.621371).toLocaleString() + " miles. " +
-    (o.group ? "The asteroid belt is shown by its largest member, Ceres; its surface is approximate. " : "") +
-    "Travel times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
-    'Surface maps: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0.';
+  const sec = (title, html) => "<section><h3>" + title + "</h3><p>" + html + "</p></section>";
+  document.getElementById("aboutBody").innerHTML =
+    sec("Scale", "Pluto is <b>" + fmtScale() + "</b> from the Sun (its average distance, 39.5 times Earth's). Everything else is scaled from that: " +
+      "<b>1 inch = " + Math.round(kmPerIn * 0.621371).toLocaleString() + " miles</b> of real space. Change it with the gear icon.") +
+    sec("True size", "At \u00d71, objects are drawn at their actual size in the model, using your screen's pixel density " +
+      "(iPhone 15 unless you use Calibrate Screen). Anything narrower than one pixel isn't drawn at all, so you have to zoom in to find it.") +
+    sec("Distances", "Each planet sits at its average distance from the Sun. Distances between two objects show a range: closest " +
+      "(same side of the Sun) to farthest (opposite sides), treating orbits as circles. The Moon uses its real closest and farthest distance from Earth.") +
+    sec("Travel times", "Times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
+      "Real trips are slower, since spacecraft follow curved paths.") +
+    (o.group ? sec("Asteroid belt", "The belt is shown by its largest member, Ceres, at the belt's average distance. Its surface map is approximate.") : "") +
+    sec("Surface maps", 'From <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0. ' +
+      "Earth's colors were adjusted, and Pluto's never-photographed southern region is filled in.");
   for (const k in cache) delete cache[k];
 }
 
@@ -1118,6 +1145,11 @@ function drawCard() { cardBox.style.width = (2.125 * ppi) + "px"; cardBox.style.
 deviceBtn.addEventListener("click", () => { slider.value = ppi; drawCard(); calib.hidden = false; });
 slider.addEventListener("input", () => { ppi = parseFloat(slider.value); calibrated = true; drawCard(); });
 document.getElementById("calibReset").addEventListener("click", () => { ppi = IPHONE15_CSS_PPI; calibrated = false; slider.value = ppi; drawCard(); try { localStorage.removeItem("ppi"); } catch (e) {} });
+const aboutSheet = document.getElementById("aboutSheet");
+document.getElementById("aboutBtn").addEventListener("click", () => { aboutSheet.hidden = false; });
+document.getElementById("aboutClose").addEventListener("click", () => { aboutSheet.hidden = true; });
+aboutSheet.addEventListener("click", e => { if (e.target === aboutSheet) aboutSheet.hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") aboutSheet.hidden = true; });
 document.getElementById("calibDone").addEventListener("click", () => {
   calib.hidden = true; updateDeviceLabel();
   try { if (calibrated) localStorage.setItem("ppi", String(ppi)); } catch (e) {}
