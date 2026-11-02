@@ -1083,7 +1083,7 @@ function updatePreview() {
   if (!(ft > 0)) { scalePreview.textContent = "Enter a distance greater than zero."; return; }
   const inPerKm = ft * 12 / (PLUTO_AU * AU_KM);
   const sun = 1392700 * inPerKm, earth = 12742 * inPerKm;
-  scalePreview.innerHTML = "Sun <b>" + fmtLen(sun) + "</b> wide, Earth <b>" + fmtLen(earth) + "</b> wide and <b>" + fmtFt(ft / PLUTO_AU) + "</b> from the Sun.";
+  scalePreview.innerHTML = "Sun <b>" + fmtLen(sun) + "</b> wide, Earth <b>" + fmtLen(earth) + "</b> wide.";
 }
 document.getElementById("scaleBtn").addEventListener("click", () => {
   scaleInput.value = +sig(scaleFt / UNIT_FT[scaleUnit], 6); scaleUnitSel.value = scaleUnit; speedInput.value = zoomSecs; updatePreview(); scaleSheet.hidden = false;
