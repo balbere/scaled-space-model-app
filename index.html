@@ -109,8 +109,8 @@ h1 { margin: 0; min-width: 0; }
 
 .panel { background: var(--panel); border-top: 1px solid var(--line); padding-block: 12px 12px; display: grid; gap: 10px; }
 .namerow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.pname { font-family: var(--font-display); font-weight: 500; font-size: 22px; margin: 0; text-wrap: balance; white-space: nowrap; }
-.like { color: var(--muted); font-size: 13px; text-align: right; min-width: 0; }
+.pname { font-family: var(--font-display); font-weight: 500; font-size: 18px; line-height: 1.2; margin: 0; text-wrap: balance; white-space: nowrap; }
+.like { flex: 1 1 auto; color: var(--muted); font-size: 13px; line-height: 1.35; text-align: right; min-width: 0; text-wrap: balance; }
 .like b { color: var(--ink); font-weight: 500; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
 .stat { min-width: 0; }
@@ -388,7 +388,7 @@ OBJECTS.filter(o => o.group).forEach(g => {
 // Everyday objects for "about the size of" (diameter or width, mm)
 const REFS = [
   [0.008, "a red blood cell"], [0.03, "a speck of dust"], [0.07, "the width of a human hair"],
-  [0.1, "the thickness of a sheet of paper"], [0.3, "a grain of table salt"], [0.6, "a grain of sand"],
+  [0.1, "the thickness of paper"], [0.3, "a grain of table salt"], [0.6, "a grain of sand"],
   [1, "a poppy seed"], [2, "a sesame seed"], [4, "a peppercorn"], [8, "a pea"], [16, "a marble"],
   [24, "a quarter"], [43, "a golf ball"], [67, "a tennis ball"], [100, "an orange"], [140, "a grapefruit"],
   [220, "a soccer ball"], [300, "a basketball, about"], [500, "a beach ball"], [750, "a yoga ball"],
@@ -787,7 +787,7 @@ function refreshStatic() {
   document.getElementById("pName").textContent = o.name;
   const km = mainKm(), din = km * IN_PER_KM;
   const like = likeText(din * 25.4);
-  document.getElementById("pLike").innerHTML = (o.group ? "4 largest, side by side.<br>Ceres is " : like.q.replace(/^./, c => c.toUpperCase()) + "<br>") +
+  document.getElementById("pLike").innerHTML = (o.group ? "4 largest, side by side. Ceres is " : like.q.replace(/^./, c => c.toUpperCase()) + " ") +
     (o.group ? like.q + " <b>" + like.what + "</b>" : "<b>" + like.what + "</b>");
   document.getElementById("kModel").textContent = o.group ? "Ceres model diameter" : "Model diameter";
   document.getElementById("kReal").textContent = o.group ? "Real diameters" : "Real diameter";
