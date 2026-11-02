@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Space Day">
 <meta name="theme-color" content="#0c0f17">
 <meta name="description" content="The official website of Space Day">
@@ -44,6 +44,9 @@
   color-scheme: dark;
 }
 html, body { height: 100%; }
+/* The strips behind the clock and the home indicator take the header/panel color (black in full-screen view) */
+html { background: var(--panel); }
+html:has(.app.theater) { background: var(--void); }
 [hidden] { display: none !important; }
 body {
   margin: 0; background: var(--void); color: var(--ink);
@@ -191,6 +194,27 @@ h1 { margin: 0; min-width: 0; }
 
 </head>
 <body>
+<script>
+// Home Screen app on iPhone: the page runs edge to edge (behind the clock and home indicator), but iOS
+// reports a page height that leaves out the status bar, so "100% tall" falls about 60pt short and leaves
+// an empty band at the bottom. When the page really is edge to edge (it has a top safe-area inset),
+// size it to the physical screen instead. In a normal browser tab nothing changes.
+(() => {
+  if (!window.navigator.standalone) return;
+  const root = document.documentElement;
+  function fit() {
+    root.style.height = "";
+    const inset = parseFloat(getComputedStyle(root).paddingTop) || 0;
+    if (inset <= 0) return;                                   // status bar not overlapping: normal sizing is right
+    const land = matchMedia("(orientation: landscape)").matches;
+    const h = land ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    if (h > root.clientHeight) { root.style.height = h + "px"; root.style.overflow = "hidden"; }
+  }
+  fit();
+  addEventListener("resize", fit);
+  addEventListener("orientationchange", () => setTimeout(fit, 300));
+})();
+</script>
 <div class="app">
   <header class="gutter">
     <div class="titlebar">
