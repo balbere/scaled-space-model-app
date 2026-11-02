@@ -251,7 +251,7 @@ h1 { margin: 0; min-width: 0; }
     <div class="tbar">
       <button class="texit" id="fsExit" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>Exit</button>
       <div class="tdrop">
-        <button class="tsel" id="tSel" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="tPicker"><i></i><span id="tSelName">Earth</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="tsel" id="tSel" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="tPicker"><i></i><span id="tSelName">Sun</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="tpicker" id="tPicker" role="menu" aria-label="Choose what to view" hidden></div>
       </div>
       <div class="tspace"></div>
@@ -262,7 +262,7 @@ h1 { margin: 0; min-width: 0; }
 
   <section class="panel gutter">
     <div class="namerow">
-      <h2 class="pname" id="pName">Earth</h2>
+      <h2 class="pname" id="pName">Sun</h2>
       <div class="like" id="pLike"></div>
     </div>
     <div class="stats">
@@ -421,7 +421,7 @@ function updateDeviceLabel() {
 updateDeviceLabel();
 
 // ---------- State ----------
-let obj = OBJECTS.find(o => o.id === "earth");
+let obj = OBJECTS.find(o => o.id === "sun");   // object shown when the app opens
 let zoom = 1;
 let cx = 0, cy = 0;          // object centre in stage CSS px
 let stageW = 0, stageH = 0, dpr = Math.min(devicePixelRatio || 1, 3);
