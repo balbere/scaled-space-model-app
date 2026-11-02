@@ -1100,6 +1100,43 @@ selectObject(obj);
 requestAnimationFrame(frame);
 })();
 </script>
+<script>
+// Self-update: when the app opens or comes back to the foreground, fetch the latest copy of this page
+// straight from the server. If it differs from the copy on screen, reload once so the newest version
+// shows right away (phones otherwise keep a saved copy for up to 10 minutes).
+(() => {
+  "use strict";
+  if (!/^https?:$/.test(location.protocol) || !window.fetch) return;
+  const url = location.pathname;
+  let shown = null, busy = false;
+  const hash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = (h * 33 ^ t.charCodeAt(i)) >>> 0; return t.length + "-" + h; };
+  async function check() {
+    if (busy || document.visibilityState !== "visible") return;
+    busy = true;
+    try {
+      if (shown === null) {
+        // the saved copy is the one this page was loaded from
+        const r = await fetch(url, { cache: "force-cache" });
+        shown = hash(await r.text());
+      }
+      const r = await fetch(url, { cache: "reload" });   // network, and refresh the saved copy
+      if (!r.ok) return;
+      const latest = hash(await r.text());
+      if (latest === shown) return;
+      let tried = null;
+      try { tried = sessionStorage.getItem("updatedTo"); } catch (e) {}
+      if (tried === latest) return;                       // already reloaded for this version once: never loop
+      try { sessionStorage.setItem("updatedTo", latest); } catch (e) {}
+      location.reload();
+    } catch (e) {
+      // offline or blocked: keep showing the current copy
+    } finally { busy = false; }
+  }
+  setTimeout(check, 1500);
+  document.addEventListener("visibilitychange", check);
+  window.addEventListener("pageshow", e => { if (e.persisted) check(); });
+})();
+</script>
 
 </body>
 </html>
