@@ -94,15 +94,6 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .zoomrow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .zoomval { font-family: var(--font-mono); font-weight: 500; font-size: 30px; line-height: 1; color: var(--sun); font-variant-numeric: tabular-nums; }
 .zoomlab { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.meter { position: relative; height: 26px; margin-top: 10px; }
-.meter .track { position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--panel-2); }
-.meter .fill { position: absolute; left: 0; top: 6px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--sun-dim), var(--sun)); width: 0; }
-.meter .tick { position: absolute; top: 13px; font: 10px var(--font-mono); color: var(--muted); transform: translateX(-50%); }
-.meter .tick::before { content: ""; position: absolute; left: 50%; top: -9px; width: 1px; height: 6px; background: var(--muted); opacity: .6; }
-.meter .tick:first-child { transform: none; }
-.meter .tick:first-child::before { left: 0; }
-.meter .tick:last-child { transform: translateX(-100%); }
-.meter .tick:last-child::before { left: auto; right: 0; }
 .equiv { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
 .equiv b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
 
@@ -241,10 +232,6 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
       <div class="zoomrow">
         <div class="zoomval" id="zoomVal">&times;1</div>
         <div class="zoomlab" id="zoomLab">true model size</div>
-      </div>
-      <div class="meter" aria-hidden="true">
-        <div class="track"></div><div class="fill" id="meterFill"></div>
-        <div id="ticks"></div>
       </div>
       <div class="equiv" id="equiv"></div>
       <div class="tinfo" id="tInfo"></div>
@@ -915,16 +902,6 @@ function scaleWord() {
   return v.toLocaleString() + "-" + names[scaleUnit];
 }
 
-// ---------- Meter ticks ----------
-const ticksEl = document.getElementById("ticks");
-const METER_MAX = MAX_ZOOM;
-[1, 10, 100, 1e3, 1e4, 1e5, 1e6].forEach(v => {
-  const s = document.createElement("span"); s.className = "tick";
-  s.style.left = (Math.log(v) / Math.log(METER_MAX) * 100) + "%";
-  s.textContent = v >= 1e6 ? "1M" + X : v >= 1e3 ? (v / 1e3) + "k" + X : v + X;
-  ticksEl.appendChild(s);
-});
-const meterFill = document.getElementById("meterFill");
 const zoomVal = document.getElementById("zoomVal"), zoomLab = document.getElementById("zoomLab");
 const tInfo = document.getElementById("tInfo");
 const equiv = document.getElementById("equiv"), sScreen = document.getElementById("sScreen"), hint = document.getElementById("hint");
@@ -1042,7 +1019,6 @@ function frame(now) {
   drawOverlay(now);
 
   // live readouts
-  meterFill.style.width = Math.max(0, Math.log(zoom) / Math.log(METER_MAX) * 100) + "%";
   setText(zoomVal, "z", fmtZoom(zoom));
   setText(zoomLab, "zl", (anim || now < zoomShownUntil) && lastZoomSecs > 0.05
     ? (anim ? "zooming \u00b7 " : "zoom took ") + lastZoomSecs.toFixed(1) + " s"
