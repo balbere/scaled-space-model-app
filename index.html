@@ -1025,11 +1025,7 @@ function frame(now) {
   // the model's scale is named in this line, so it's always visible which size of model is on screen
   const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
   const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft", yd: "yd", mi: "mile" }[scaleUnit] + "</b> model";   // "500 ft model", "2 mile model"
-  setText(equiv, "eq", Math.abs(zoom - 1) < 0.005
-    ? "Your screen shows <b>" + fmtLen(screenIn) + "</b> of " + model + " across."
-    : zoom < 1
-      ? "Your screen now shows <b>" + fmtLen(screenIn / zoom) + "</b> of " + model + " across."
-      : "Like a phone <b>" + fmtLen(screenIn * zoom) + "</b> wide, showing <b>" + fmtLen(screenIn / zoom) + "</b> of " + model);
+  setText(equiv, "eq", "Your screen shows <b>" + fmtLen(screenIn / zoom) + "</b> of " + model + " across.");
   const dCss = mainDiamCss(), dPx = dCss * dpr;
   const lit = dPx >= 1;
   setText(sScreen, "ss", fmtLen(dCss / ppi));
