@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Space Day">
 <meta name="theme-color" content="#0c0f17">
 <meta name="description" content="The official website of Space Day">
@@ -51,6 +51,10 @@ body {
   overflow: hidden; -webkit-user-select: none; user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+/* Solid strip behind the phone's clock and battery icons, matching the header (black in full-screen view),
+   so the iPhone's status-bar blur has nothing to smear when the site runs as a Home Screen app */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--panel); z-index: 10; pointer-events: none; }
+body:has(.app.theater)::before { background: var(--void); }
 .app { height: 100%; display: flex; flex-direction: column; }
 .gutter {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
