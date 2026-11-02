@@ -83,7 +83,8 @@ h1 { margin: 0; min-width: 0; }
   border-radius: 999px; padding: 6px 12px 6px 6px; font: 500 13px var(--font-body); cursor: pointer;
 }
 .chip i { width: 18px; height: 18px; border-radius: 50%; display: block; }
-.chip i.belt { background: radial-gradient(circle, #9a948c 0 1.5px, transparent 2px) 2px 3px / 7px 6px, var(--panel); border: 1px dashed #6d6860; box-sizing: border-box; }
+.chip i.belt { background: none; border-radius: 0; }
+i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .chip[aria-pressed="true"] { border-color: var(--sun); background: #241b0c; }
 
 .stage { position: relative; flex: 1 1 auto; min-height: 0; touch-action: none; background: var(--void); overflow: hidden; }
@@ -174,12 +175,12 @@ h1 { margin: 0; min-width: 0; }
 .tsel > svg { transform: rotate(180deg); }
 .tsel[aria-expanded="true"] > svg { transform: none; }
 .tsel i { width: 18px; height: 18px; border-radius: 50%; display: block; flex: 0 0 auto; }
-.tsel i.belt { background: radial-gradient(circle, #9a948c 0 1.5px, transparent 2px) 2px 3px / 7px 6px, var(--panel); border: 1px dashed #6d6860; box-sizing: border-box; }
+.tsel i.belt { background: none; border-radius: 0; }
 .tpicker { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding: 5px; background: rgba(12,15,23,.96); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.6); scrollbar-width: none; overscroll-behavior: contain; touch-action: pan-y; z-index: 3; }
 .tpicker::-webkit-scrollbar { display: none; }
 .tbar .tchip { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; border-radius: 8px; padding: 6px 8px 6px 5px; text-align: left; background: none; border-color: transparent; }
 .tchip i { width: 16px; height: 16px; border-radius: 50%; display: block; flex: 0 0 auto; }
-.tchip i.belt { background: radial-gradient(circle, #9a948c 0 1.5px, transparent 2px) 2px 3px / 7px 6px, var(--panel); border: 1px dashed #6d6860; box-sizing: border-box; }
+.tchip i.belt { background: none; border-radius: 0; }
 .tbar .tchip[aria-pressed="true"] { border-color: var(--sun-dim); background: #241b0c; color: var(--sun); }
 .trow { display: flex; gap: 6px; }
 .trow { flex: 0 0 auto; }
@@ -368,7 +369,7 @@ const OBJECTS = [
   { id:"earth",   name:"Earth",   tex:"earth", km:12742,  au:1.000, dayH:23.93,  obl:23.4, view:12, swatch:"#3d6fb0", limb:0.0, atmo:0.6, atmoCol:[0.45,0.7,1] },
   { id:"moon",    name:"Moon",    tex:"moon", km:3474.8, au:1.000, dayH:655.7, obl:1.5, view:6, swatch:"#a9a8a4", limb:0.0, atmo:0, off:0.5 },
   { id:"mars",    name:"Mars",    tex:"mars", km:6779,   au:1.524, dayH:24.62,  obl:25.2, view:12, swatch:"#c2643a", limb:0.0, atmo:0.15, atmoCol:[1,0.75,0.6] },
-  { id:"belt", name:"Asteroid belt", short:"Asteroids", group:true, au:2.7, members:[
+  { id:"belt", name:"Asteroid belt", group:true, au:2.7, members:[
       { name:"Ceres",  tex:"asteroid", km:939, dims:[964, 892, 964], dayH:9.07,  obl:4,  view:10, tint:[0.42,0.42,0.43], off:0.1 } ] },
   { id:"jupiter", name:"Jupiter", tex:"jupiter", km:139820, au:5.203, dayH:9.93,   obl:3.1,  view:8,  swatch:"#c9a27a", limb:0.45, atmo:0 },
   { id:"saturn",  name:"Saturn",  tex:"saturn", km:116460, au:9.537, dayH:10.66,  obl:26.7, view:22, swatch:"#dcc596", limb:0.4, atmo:0, ring:true },
@@ -444,6 +445,17 @@ const mainDiamCss = () => mainKm() * pxPerKm();
 const extentCss = () => obj.group ? obj.extentKm * pxPerKm() : mainDiamCss() * (obj.ring ? RING_OUT : 1);
 
 // ---------- Chips ----------
+// A small lumpy, cratered rock for the asteroid belt (the other objects get round color swatches)
+const ROCK_ICON = '<i class="belt"><svg viewBox="2 2 16 16" aria-hidden="true">' +
+  // no gradients: a gradient's definition stops working when the copy holding it is hidden
+  '<path d="M4.3 6.4C5.5 3.7 8.6 2.4 11.6 3.1c2.6.6 4.9 2 5.5 4.6.5 2.2-.4 3.4.1 5.4.4 2-1.5 3.9-3.9 4.3-2.3.4-3.6-.7-5.8-.4-2.4.3-4.6-.9-5-3.2-.4-2 .8-3.2.6-4.8-.1-1.1.7-1.9 1.2-2.6z" fill="#4a443e"/>' +
+  '<path d="M5 6.6C6.1 4.4 8.8 3.4 11.4 3.9c2.2.5 4.1 1.7 4.6 3.9.3 1.6-.4 2.7-.2 4.2-1.9.9-4.3 1.2-6.6.8C7 12.4 5 11.3 4.2 9.6c-.2-1.1.4-2.2.8-3z" fill="#8f877b"/>' +
+  '<path d="M6.3 6.3c.9-1.3 2.7-1.9 4.4-1.5 1 .2 1.4.8.9 1.4-.9 1-2.6 1.3-4.1 1.3-1 0-1.6-.5-1.2-1.2z" fill="#c8c1b4" opacity=".8"/>' +
+  '<ellipse cx="12.4" cy="7.6" rx="1.7" ry="1.3" fill="#3b3631" opacity=".8"/>' +
+  '<ellipse cx="7.8" cy="12.4" rx="2" ry="1.5" fill="#2f2b27" opacity=".75"/>' +
+  '<ellipse cx="13.8" cy="13.2" rx="1" ry=".8" fill="#2f2b27" opacity=".75"/>' +
+  '<ellipse cx="7.3" cy="8.8" rx=".7" ry=".55" fill="#4f4943" opacity=".8"/>' +
+  '</svg></i>';
 const chips = document.getElementById("chips"), tPicker = document.getElementById("tPicker");
 const tSel = document.getElementById("tSel");
 function closeDrop() { if (!tPicker.hidden) { tPicker.hidden = true; tSel.setAttribute("aria-expanded", "false"); } }
@@ -458,7 +470,7 @@ const theater = () => app.classList.contains("theater");
 OBJECTS.forEach(o => {
   const b = document.createElement("button");
   b.className = "chip"; b.type = "button"; b.id = "chip-" + o.id; b.dataset.id = o.id;
-  const sw = o.group ? '<i class="belt"></i>'
+  const sw = o.group ? ROCK_ICON
     : o.sun ? '<i style="background:radial-gradient(circle at 50% 50%, #fff3c4, #ffb547 55%, #c25d10 100%)"></i>'
     : `<i style="background:radial-gradient(circle at 35% 35%, ${o.swatch}, #000 120%)"></i>`;
   b.innerHTML = sw + (o.short || o.name);
