@@ -526,9 +526,10 @@ void main(){
     float u = (rho - uRin) / (uRout - uRin);
     if (u > 0. && u < 1.) {
       vec4 rc = texture(uRing, vec2(u, .5));
-      // no planet shadow on the rings: with the light set where it is, the shadow fell across the far side
-      // of the rings as a large black wedge that looked like a missing piece
-      vec3 rcol = min(rc.rgb * 1.3, 1.) * (.4 + .6 * abs(dot(N, uL)));
+      float pl = dot(P, uL);
+      float sh = 1.;
+      if (pl < 0. && length(P - pl * uL) < 1.) sh = .08;
+      vec3 rcol = min(rc.rgb * 1.3, 1.) * sh * (.4 + .6 * abs(dot(N, uL)));
       float ra = rc.a * .95;
       bool front = edge <= 0. || z > s.z;
       if (front) col = vec4(rcol * ra, ra) + col * (1. - ra);
