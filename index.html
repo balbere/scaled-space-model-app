@@ -155,7 +155,7 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .iconbtn svg { width: 18px; height: 18px; }
 .app.theater header, .app.theater .panel, .app.theater #fsBtn { display: none; }
 .tbar { display: none; }
-.app.theater .tbar { display: flex; flex-direction: row; align-items: stretch; gap: 6px; position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: 12px; z-index: 2; }
+.app.theater .tbar { display: flex; flex-direction: row; align-items: stretch; gap: 6px; position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: 12px; z-index: 4; }   /* above the All view's popups, so the object menu opens over them */
 @media (min-width: 600px) { .app.theater .tbar { left: auto; width: 440px; } }
 .tbar button { min-height: 42px; }
 .tbar button { font: 500 12px var(--font-body); color: var(--ink); background: rgba(20,25,39,.85); border: 1px solid var(--line); cursor: pointer; }
@@ -1269,7 +1269,7 @@ function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
   setText(zoomLab, "zl", "");
   setText(equiv, "eq", "Spacing <u>is</u> to scale");
-  if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time");
+  if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
   hint.hidden = allHintStep >= 2;
   if (!hint.hidden) setText(hint, "h", allHintStep === 0 ? "Pinch to spread out the inner planets" : "Tap a line for distance and travel time");
