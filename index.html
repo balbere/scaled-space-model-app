@@ -75,7 +75,12 @@ h1 { margin: 0; min-width: 0; }
 .scalebtn em { font-style: normal; font-family: var(--font-body); font-weight: 500; font-size: 11px; color: var(--muted); margin-left: 6px; text-decoration: underline dotted; text-underline-offset: 3px; }
 .device { font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; white-space: nowrap; }
 .device:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
-.chips { display: flex; gap: 6px; overflow-x: auto; padding-block: 6px 10px; scrollbar-width: none; }
+/* The chip row scrolls edge to edge: it pulls out over the header's side gutters, then pads back in so the
+   first and last chips still line up with the title when scrolled all the way */
+.chips { --g-l: max(16px, env(safe-area-inset-left, 0px)); --g-r: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; gap: 6px; overflow-x: auto; padding-block: 6px 10px; scrollbar-width: none;
+  margin-inline: calc(-1 * var(--g-l)) calc(-1 * var(--g-r)); padding-inline: var(--g-l) var(--g-r); scroll-padding-inline: var(--g-l) var(--g-r); }
+.chips::after { content: ""; flex: 0 0 1px; }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
   flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
