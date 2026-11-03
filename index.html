@@ -289,6 +289,8 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
     </div>
     <div class="actions">
       <button class="btn" id="btnTrue" type="button">True size &times;1</button>
+      <button class="btn" id="btnInner" type="button" hidden>Inner planets</button>
+      <button class="btn" id="btnOuter" type="button" hidden>Outer planets</button>
       <button class="btn primary" id="btnFill" type="button">Zoom to fill</button>
     </div>
   </section>
@@ -835,10 +837,10 @@ stage.addEventListener("touchmove", e => { if (!e.target.closest(".tbar")) e.pre
 let anim = null, lastZoomSecs = 0, zoomShownUntil = 0;
 let zoomSecs = 5;   // seconds for Earth to go from true size to filling the view
 try { const z = parseFloat(localStorage.getItem("zoomSecs")); if (z >= 0.5 && z <= 600) zoomSecs = z; } catch (e) {}
-function animateTo(targetZoom) {
+function animateTo(targetZoom, tx, ty) {
   autoFit = false;
   targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
-  const tx = view().x, ty = homeY();
+  if (tx === undefined) { tx = view().x; ty = homeY(); }
   if (reduceMotion) { zoom = targetZoom; cx = tx; cy = ty; return; }
   // Constant zoom speed: going from Earth at true size to Earth filling the view takes zoomSecs seconds (default 5),
   // so the time any zoom takes shows how big the size difference is.
@@ -847,7 +849,22 @@ function animateTo(targetZoom) {
   const zoomMs = Math.abs(Math.log(targetZoom / zoom)) / rate;
   const dur = Math.max(zoomMs, 400);                             // short glide if only re-centering
   anim = { t0: performance.now(), dur, zoomMs, z0: Math.log(zoom), z1: Math.log(targetZoom), x0: cx, y0: cy, x1: tx, y1: ty };
+  if (obj.all) {               // the one screen point that stays put while zooming from start to finish
+    const k = targetZoom / zoom;
+    if (Math.abs(Math.log(k)) > 0.01) { anim.fx = (tx - cx * k) / (1 - k); anim.fy = (ty - cy * k) / (1 - k); anim.zs = zoom; }
+  }
 }
+// All view: zoom so the stretch from one distance to another (in AU) fills the line, nearer end at bottom left
+function frameRange(auA, auB) {
+  const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
+  allDir = [(r.r - r.l) / L, -(r.b - r.t) / L];
+  const z = L / ((auB - auA) * AU_KM * IN_PER_KM * ppi);
+  const d = auA * AU_KM * IN_PER_KM * ppi * z;      // screen distance from the Sun to the near end
+  animateTo(z, r.l - allDir[0] * d, r.b - allDir[1] * d);
+}
+const auOf = id => OBJECTS.find(o => o.id === id).au;
+document.getElementById("btnInner").addEventListener("click", () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("belt")); });
+document.getElementById("btnOuter").addEventListener("click", () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); });
 function fitZoom() {
   const base = extentCss() / zoom;
   animateTo(view().fit / base);
@@ -877,6 +894,8 @@ function refreshStatic() {
   document.getElementById("statsAll").hidden = !o.all;
   document.getElementById("statsOne").hidden = !!o.all;
   document.getElementById("btnTrue").hidden = !!o.all;
+  document.getElementById("btnInner").hidden = !o.all;
+  document.getElementById("btnOuter").hidden = !o.all;
   document.getElementById("tTrue").hidden = !!o.all;
   document.getElementById("btnFill").textContent = o.all ? "Show all" : "Zoom to fill";
   document.getElementById("tFill").textContent = o.all ? "Show all" : "Fill";
@@ -1115,7 +1134,8 @@ function drawAllOverlay() {
   for (const p of P) {
     if (p.x < -40 || p.x > stageW + 40 || p.y < -20 || p.y > stageH + 20) continue;
     if (Math.hypot(p.x - lx, p.y - ly) < 40) continue;
-    ctx.fillText(p.o.short || p.o.name, p.x, p.y + ICON_R + 13);
+    const name = p.o.short || p.o.name, hw = ctx.measureText(name).width / 2 + 4;
+    ctx.fillText(name, Math.min(Math.max(p.x, hw), stageW - hw), p.y + ICON_R + 13);   // keep names on screen
     lx = p.x; ly = p.y;
   }
   // popup for the tapped line, kept beside the line's midpoint
@@ -1138,7 +1158,8 @@ function frame(now) {
   if (anim) {
     const k = Math.min(1, (now - anim.t0) / anim.dur);       // linear: constant rate
     zoom = Math.exp(anim.z0 + (anim.z1 - anim.z0) * k);
-    cx = anim.x0 + (anim.x1 - anim.x0) * k; cy = anim.y0 + (anim.y1 - anim.y0) * k;
+    if (anim.fx !== undefined) { const q = zoom / anim.zs; cx = anim.fx + (anim.x0 - anim.fx) * q; cy = anim.fy + (anim.y0 - anim.fy) * q; }
+    else { cx = anim.x0 + (anim.x1 - anim.x0) * k; cy = anim.y0 + (anim.y1 - anim.y0) * k; }
     lastZoomSecs = Math.min(now - anim.t0, anim.zoomMs) / 1000;
     zoomShownUntil = now + 2500;
     if (k >= 1) anim = null;
