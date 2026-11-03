@@ -278,8 +278,6 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
     <div class="stats" id="statsAll" hidden>
       <div class="stat"><div class="k">Sun to Pluto</div><div class="v" id="aSpan"></div></div>
       <div class="stat"><div class="k">Starship, Sun to Pluto</div><div class="v" id="aTrip"></div></div>
-      <div class="stat"><div class="k">Objects shown</div><div class="v" id="aCount"></div></div>
-      <div class="stat"><div class="k">Average spacing</div><div class="v" id="aGap"></div></div>
     </div>
     <div class="stats" id="statsOne">
       <div class="stat"><div class="k" id="kModel">Model diameter</div><div class="v" id="sModel"></div></div>
@@ -927,8 +925,6 @@ function refreshStatic() {
     document.getElementById("pLike").textContent = "";
     document.getElementById("aSpan").textContent = fmtFt(ALL_AU * FT_PER_AU);
     document.getElementById("aTrip").textContent = fmtTrip(ALL_AU);
-    document.getElementById("aCount").textContent = ALL_LIST.length;
-    document.getElementById("aGap").textContent = fmtFt(ALL_AU * FT_PER_AU / (ALL_LIST.length - 1));
     refreshAbout(o);
     return;
   }
