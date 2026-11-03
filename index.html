@@ -1203,9 +1203,7 @@ function frame(now) {
 function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
   setText(zoomLab, "zl", "");
-  const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
-  const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft", yd: "yd", mi: "mile" }[scaleUnit] + "</b> model";
-  setText(equiv, "eq", "Spacing to scale: your screen spans <b>" + fmtLen(stageW / ppi / zoom) + "</b> of " + model + ".");
+  setText(equiv, "eq", "Spacing <u>is</u> to scale");
   if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
   hint.hidden = allHintStep >= 2;
