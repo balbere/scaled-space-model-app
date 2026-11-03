@@ -259,7 +259,7 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
         <div class="tpicker" id="tPicker" role="menu" aria-label="Choose what to view" hidden></div>
       </div>
       <div class="tspace"></div>
-      <div class="trow"><button id="tTrue" type="button">&times;1</button><button id="tFill" class="primary" type="button">Fill</button></div>
+      <div class="trow"><button id="tTrue" type="button">&times;1</button><button id="tInner" type="button" hidden>Inner</button><button id="tOuter" type="button" hidden>Outer</button><button id="tFill" class="primary" type="button">Fill</button></div>
     </div>
     <div class="hint" id="hint">Pinch out to zoom in</div>
     <div class="segpop" id="segPop" hidden><b id="segName"></b><span id="segVal"></span></div>
@@ -863,8 +863,10 @@ function frameRange(auA, auB) {
   animateTo(z, r.l - allDir[0] * d, r.b - allDir[1] * d);
 }
 const auOf = id => OBJECTS.find(o => o.id === id).au;
-document.getElementById("btnInner").addEventListener("click", () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("belt")); });
-document.getElementById("btnOuter").addEventListener("click", () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); });
+const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("belt")); };
+const showOuter = () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); };
+["btnInner", "tInner"].forEach(id => document.getElementById(id).addEventListener("click", showInner));
+["btnOuter", "tOuter"].forEach(id => document.getElementById(id).addEventListener("click", showOuter));
 function fitZoom() {
   const base = extentCss() / zoom;
   animateTo(view().fit / base);
@@ -896,6 +898,8 @@ function refreshStatic() {
   document.getElementById("btnTrue").hidden = !!o.all;
   document.getElementById("btnInner").hidden = !o.all;
   document.getElementById("btnOuter").hidden = !o.all;
+  document.getElementById("tInner").hidden = !o.all;
+  document.getElementById("tOuter").hidden = !o.all;
   document.getElementById("tTrue").hidden = !!o.all;
   document.getElementById("btnFill").textContent = o.all ? "Show all" : "Zoom to fill";
   document.getElementById("tFill").textContent = o.all ? "Show all" : "Fill";
@@ -1132,7 +1136,8 @@ function drawAllOverlay() {
   ctx.fillStyle = "rgba(236,239,246,0.85)"; ctx.textAlign = "center";
   let lx = -1e9, ly = -1e9;
   for (const p of P) {
-    if (p.x < -40 || p.x > stageW + 40 || p.y < -20 || p.y > stageH + 20) continue;
+    if (p.x < -40 || p.x > stageW + 40 || p.y < -20) continue;
+    if (p.y + ICON_R + 13 > (scaleY || stageH - 22) - 20) continue;   // no names over the scale bar or buttons
     if (Math.hypot(p.x - lx, p.y - ly) < 40) continue;
     const name = p.o.short || p.o.name, hw = ctx.measureText(name).width / 2 + 4;
     ctx.fillText(name, Math.min(Math.max(p.x, hw), stageW - hw), p.y + ICON_R + 13);   // keep names on screen
