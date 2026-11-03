@@ -901,7 +901,7 @@ function refreshStatic() {
   document.getElementById("tFill").textContent = o.all ? "Show all" : "Fill";
   zoomVal.classList.toggle("nts", !!o.all);
   if (o.all) {
-    document.getElementById("pLike").textContent = "Sizes enlarged; spacing to scale";
+    document.getElementById("pLike").textContent = "";
     document.getElementById("aSpan").textContent = fmtFt(ALL_AU * FT_PER_AU);
     document.getElementById("aTrip").textContent = fmtTrip(ALL_AU);
     document.getElementById("aCount").textContent = ALL_LIST.length;
