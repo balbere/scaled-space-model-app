@@ -753,6 +753,8 @@ function measureTheater() {
 function resize() {
   const r = stage.getBoundingClientRect();
   const firstLayout = stageW === 0;
+  const allRange = obj.all && !firstLayout && !autoFit ? (pendingAllRange || currentAllRange()) : null;
+  pendingAllRange = null;
   const oldW = stageW, oldH = stageH;
   stageW = r.width; stageH = r.height; dpr = Math.min(devicePixelRatio || 1, 3);
   [bgc, glc, ov].forEach(c => { c.width = Math.round(stageW * dpr); c.height = Math.round(stageH * dpr); });
@@ -761,6 +763,7 @@ function resize() {
   measureTheater();
   if (firstLayout) { cx = view().x; cy = homeY(); }
   else if (autoFit && !anim) refit();
+  else if (allRange) { anim = null; setAllRange(allRange[0], allRange[1]); }
   else { cx += (stageW - oldW) / 2; cy += (stageH - oldH) / 2; }
   clampCenter();
 }
@@ -854,6 +857,22 @@ function animateTo(targetZoom, tx, ty) {
     if (Math.abs(Math.log(k)) > 0.01) { anim.fx = (tx - cx * k) / (1 - k); anim.fy = (ty - cy * k) / (1 - k); anim.zs = zoom; }
   }
 }
+// All view: which stretch of the solar system (in AU from the Sun) the corner-to-corner diagonal currently covers
+function currentAllRange() {
+  const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t), perAU = AU_KM * pxPerKm();
+  const a = ((r.l - cx) * allDir[0] + (r.b - cy) * allDir[1]) / perAU;
+  return [a, a + L / perAU];
+}
+// show a stretch instantly, re-angling the line to run corner to corner on the current screen
+function setAllRange(auA, auB) {
+  const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
+  if (!(auB > auA) || !(L > 0)) return;
+  allDir = [(r.r - r.l) / L, -(r.b - r.t) / L];
+  zoom = L / ((auB - auA) * AU_KM * IN_PER_KM * ppi);
+  const d = auA * AU_KM * pxPerKm();
+  cx = r.l - allDir[0] * d; cy = r.b - allDir[1] * d;
+}
+let pendingAllRange = null;   // captured just before the screen layout changes (entering or leaving full screen)
 // All view: zoom so the stretch from one distance to another (in AU) fills the line, nearer end at bottom left
 function frameRange(auA, auB) {
   const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
@@ -1240,6 +1259,7 @@ let inFs = false;
 const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
 function enterTheater() {
   const keep = { z: zoom };
+  if (obj.all && !autoFit) { anim = null; pendingAllRange = currentAllRange(); }
   app.classList.add("theater");
   const el = document.documentElement, rf = el.requestFullscreen || el.webkitRequestFullscreen;
   if (rf) {
@@ -1248,15 +1268,16 @@ function enterTheater() {
       if (pr && pr.catch) pr.catch(() => {});
     } catch (e) {}
   }
-  requestAnimationFrame(() => { resize(); if (autoFit) refit(); else { zoom = keep.z; cx = view().x; cy = homeY(); } clampCenter(); });
+  requestAnimationFrame(() => { resize(); if (autoFit) refit(); else if (!obj.all) { zoom = keep.z; cx = view().x; cy = homeY(); } clampCenter(); });
 }
 function exitTheater() {
   closeDrop();
   if (!theater()) return;
+  if (obj.all && !autoFit) { anim = null; pendingAllRange = currentAllRange(); }
   app.classList.remove("theater");
   try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   if (fsEl()) { const ex = document.exitFullscreen || document.webkitExitFullscreen; try { const pr = ex.call(document); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
-  requestAnimationFrame(() => { resize(); if (autoFit) refit(); else { cx = view().x; cy = homeY(); } clampCenter(); });
+  requestAnimationFrame(() => { resize(); if (autoFit) refit(); else if (!obj.all) { cx = view().x; cy = homeY(); } clampCenter(); });
 }
 ["fullscreenchange", "webkitfullscreenchange"].forEach(t => document.addEventListener(t, () => {
   if (fsEl()) inFs = true; else if (inFs) { inFs = false; exitTheater(); }
