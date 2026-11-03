@@ -1201,8 +1201,8 @@ function frame(now) {
 }
 
 function allReadouts() {
-  setText(zoomVal, "z", "NOT TO SCALE");
-  setText(zoomLab, "zl", "sizes enlarged");
+  setText(zoomVal, "z", "PLANETS NOT TO SCALE");
+  setText(zoomLab, "zl", "");
   const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
   const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft", yd: "yd", mi: "mile" }[scaleUnit] + "</b> model";
   setText(equiv, "eq", "Spacing to scale: your screen spans <b>" + fmtLen(stageW / ppi / zoom) + "</b> of " + model + ".");
