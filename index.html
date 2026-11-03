@@ -183,6 +183,15 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .trow button { flex: 0 0 auto; min-width: 48px; border-radius: 10px; padding: 8px 4px; font-weight: 600; }
 .trow button.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
 .app.theater .hint { bottom: 98px; }
+/* "All" view */
+.zoomval.nts { font-size: 21px; letter-spacing: 0.04em; }
+.app.theater .zoomval.nts { font-size: 19px; }
+.segpop { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; background: rgba(12,15,23,.94); border: 1px solid var(--sun-dim); border-radius: 10px; padding: 7px 11px; box-shadow: 0 6px 20px rgba(0,0,0,.5); max-width: 190px; text-align: center; }
+.segpop b { display: block; font: 600 12.5px var(--font-body); color: var(--ink); }
+.segpop span { display: block; font: 500 13px var(--font-mono); color: var(--sun); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.segpop small { display: block; font: 10.5px var(--font-body); color: var(--muted); margin-top: 3px; }
+i.allic { background: none !important; border-radius: 0; }
+i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .app.theater .zoomval { font-size: 24px; }
 .tinfo { display: none; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .tinfo b { color: var(--ink); font-weight: 600; }
@@ -254,6 +263,7 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
       <div class="trow"><button id="tTrue" type="button">&times;1</button><button id="tFill" class="primary" type="button">Fill</button></div>
     </div>
     <div class="hint" id="hint">Pinch out to zoom in</div>
+    <div class="segpop" id="segPop" hidden><b id="segName"></b><span id="segVal"></span><small>gap between their average distances from the Sun</small></div>
   </div>
 
   <section class="panel gutter">
@@ -266,7 +276,13 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
       </div>
       <div class="like" id="pLike"></div>
     </div>
-    <div class="stats">
+    <div class="stats" id="statsAll" hidden>
+      <div class="stat"><div class="k">Sun to Pluto</div><div class="v" id="aSpan"></div></div>
+      <div class="stat"><div class="k">Starship, Sun to Pluto</div><div class="v" id="aTrip"></div></div>
+      <div class="stat"><div class="k">Objects shown</div><div class="v" id="aCount"></div></div>
+      <div class="stat"><div class="k">Average spacing</div><div class="v" id="aGap"></div></div>
+    </div>
+    <div class="stats" id="statsOne">
       <div class="stat"><div class="k" id="kModel">Model diameter</div><div class="v" id="sModel"></div></div>
       <div class="stat live"><div class="k">On your screen now</div><div class="v" id="sScreen"></div></div>
       <div class="stat"><div class="k"><span class="kpick"><span class="kref" id="distModeLabel">Distance</span><select id="distMode" aria-label="Show distance or travel time"><option value="dist">Distance</option><option value="time">Time</option></select></span> from <span class="kpick"><span class="kref" id="distRefLabel">Sun</span><select id="distRef" aria-label="Measured from which object"></select></span></div><div class="v" id="sDist"></div></div>
@@ -335,7 +351,7 @@ const X = "×";
 const AU_KM = 149597870.7;
 const PLUTO_AU = 39.5;
 const IPHONE15_CSS_PPI = 460 / 3;          // 460 physical ppi at 3x = 153.33 CSS px per inch
-const MIN_ZOOM = 0.01, MAX_ZOOM = 1e6;
+const MIN_ZOOM = 1e-9, MAX_ZOOM = 1e6;   // tiny minimum so the All view can show a whole large model
 const UNIT_FT = { ft: 1, yd: 3, mi: 5280 };
 
 let scaleFt = 500, scaleUnit = "ft";
@@ -353,6 +369,8 @@ applyScale();
 // ---------- Objects ----------
 // km: diameter used for the readouts. axes: rendered radii ratios [screen x, screen y (pole), depth] for lumpy bodies.
 const OBJECTS = [
+  // "All": every object except the Moon, drawn the same size along one line, spaced by average distance from the Sun
+  { id:"all", name:"Solar System", short:"All", all:true },
   { id:"sun", name:"Sun", tex:"sun", km:1392700, au:0, dayH:609, obl:7.25, view:6, swatch:"#ffb547", sun:true },
   { id:"mercury", name:"Mercury", tex:"mercury", km:4879,   au:0.387, dayH:1407.6, obl:0.03, view:12, swatch:"#9a9690", limb:0.0, atmo:0 },
   { id:"venus",   name:"Venus",   tex:"venus", km:12104,  au:0.723, dayH:-96,    obl:2.6,  view:10, swatch:"#e3c98f", limb:0.35, atmo:0.25, atmoCol:[1,0.9,0.7] },
@@ -432,7 +450,29 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const mainKm = () => obj.group ? obj.members[0].km : obj.km;           // the body the readouts describe
 const pxPerKm = () => IN_PER_KM * ppi * zoom;                          // CSS px per real km at this zoom
 const mainDiamCss = () => mainKm() * pxPerKm();
-const extentCss = () => obj.group ? obj.extentKm * pxPerKm() : mainDiamCss() * (obj.ring ? RING_OUT : 1);
+const extentCss = () => obj.all ? ALL_AU * AU_KM * pxPerKm()       // All view: length of the Sun-to-Pluto line
+  : obj.group ? obj.extentKm * pxPerKm() : mainDiamCss() * (obj.ring ? RING_OUT : 1);
+
+// ---------- All view geometry ----------
+const ALL_LIST = OBJECTS.filter(o => !o.all && o.id !== "moon");   // Sun ... Pluto, in order
+const ALL_AU = 39.5;           // Sun to Pluto
+const ICON_R = 13;             // radius of every object in the All view, CSS px (same size on screen at any zoom)
+let allDir = [0.6, -0.8];      // unit direction of the line, bottom left to top right
+let hudBottom = 70;
+function allRect() {           // where the line runs when the whole model is shown
+  const top = theater() ? theaterTop : hudBottom + 6, bottom = theater() ? theaterBottom : 44;
+  const pad = ICON_R + 8;
+  return { l: pad + 6, r: stageW - pad - 10, t: top + pad, b: stageH - bottom - pad - 12 };
+}
+// screen position and size of each body drawn this frame
+function placements() {
+  const k = pxPerKm();
+  if (obj.all) return ALL_LIST.map(o => {
+    const d = o.au * AU_KM * k;
+    return { b: bodiesOf(o)[0], o, x: cx + allDir[0] * d, y: cy + allDir[1] * d, R: ICON_R };
+  });
+  return bodiesOf(obj).map(b => ({ b, x: cx + b.xKm * k, y: cy + b.yKm * k, R: b.radKm * k }));
+}
 
 // ---------- Chips ----------
 // A small lumpy, cratered rock for the asteroid belt (the other objects get round color swatches)
@@ -445,6 +485,14 @@ const ROCK_ICON = '<i class="belt"><svg viewBox="2 2 16 16" aria-hidden="true">'
   '<ellipse cx="7.8" cy="12.4" rx="2" ry="1.5" fill="#2f2b27" opacity=".75"/>' +
   '<ellipse cx="13.8" cy="13.2" rx="1" ry=".8" fill="#2f2b27" opacity=".75"/>' +
   '<ellipse cx="7.3" cy="8.8" rx=".7" ry=".55" fill="#4f4943" opacity=".8"/>' +
+  '</svg></i>';
+// "All": the Sun in a corner with three orbits and a planet on each (flat colors, no gradients)
+const ALL_ICON = '<i class="allic"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none">' +
+  '<path d="M3.5 9.5A6.5 6.5 0 0 1 10 16M3.5 5A11 11 0 0 1 14.5 16M3.5 1A15 15 0 0 1 18.5 16" stroke="#59627a" stroke-width="1"/>' +
+  '<circle cx="3.5" cy="16" r="3.2" fill="#ffb547"/>' +
+  '<circle cx="8.1" cy="11.4" r="1.4" fill="#4a7fd6"/>' +
+  '<circle cx="11.3" cy="8.2" r="1.9" fill="#c9a27a"/>' +
+  '<circle cx="14.1" cy="5.4" r="1.3" fill="#a6dbe2"/>' +
   '</svg></i>';
 const chips = document.getElementById("chips"), tPicker = document.getElementById("tPicker");
 const tSel = document.getElementById("tSel");
@@ -460,7 +508,7 @@ const theater = () => app.classList.contains("theater");
 OBJECTS.forEach(o => {
   const b = document.createElement("button");
   b.className = "chip"; b.type = "button"; b.id = "chip-" + o.id; b.dataset.id = o.id;
-  const sw = o.group ? ROCK_ICON
+  const sw = o.all ? ALL_ICON : o.group ? ROCK_ICON
     : o.sun ? '<i style="background:radial-gradient(circle at 50% 50%, #fff3c4, #ffb547 55%, #c25d10 100%)"></i>'
     : `<i style="background:radial-gradient(circle at 35% 35%, ${o.swatch}, #000 120%)"></i>`;
   b.innerHTML = sw + (o.short || o.name);
@@ -616,6 +664,7 @@ const BG = {
   uranus:  { c: ["#7af0ff", "#4ab8d8", "#c6ffff"], a: 0.04, stars: 1.2 },
   neptune: { c: ["#3a5cff", "#2a3aa0", "#7a9aff"], a: 0.05, stars: 1.3 },
   pluto:   { c: ["#6a5a8a", "#3a3050", "#a08ac0"], a: 0.03, stars: 1.6 },
+  all:     { c: ["#ffb547", "#4a7fd6", "#b47cff", "#5fd4c4"], a: 0.035, stars: 1.4 },
 };
 function rngFor(str) {
   let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
@@ -676,6 +725,10 @@ function drawBackground() {
 const stage = document.getElementById("stage");
 // usable viewing area: in full-screen mode the picker column takes the right edge
 function view() {
+  if (obj.all) {               // All view: anchor is the Sun at the bottom-left end; "fit" is the line's length
+    const r = allRect();
+    return { x: r.l, y: r.b, fit: Math.hypot(r.r - r.l, r.b - r.t) };
+  }
   if (theater()) {
     // portrait-first: readouts across the top, controls and scale bar along the bottom, planet in between
     const top = theaterTop, bottom = theaterBottom;
@@ -687,6 +740,7 @@ const homeY = () => view().y;
 let theaterTop = 120, theaterBottom = 110, scaleY = 0;
 function measureTheater() {
   const sr = stage.getBoundingClientRect();
+  hudBottom = document.querySelector(".hud").getBoundingClientRect().bottom - sr.top;
   if (theater()) {
     const hb = document.querySelector(".hud").getBoundingClientRect().bottom - sr.top;
     const bt = document.querySelector(".tbar").getBoundingClientRect().top - sr.top;
@@ -712,6 +766,13 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 
 function clampCenter() {
+  if (obj.all) {               // keep part of the line on screen
+    const E = extentCss(), ex = cx + allDir[0] * E, ey = cy + allDir[1] * E, m = 30;
+    const minX = Math.min(cx, ex), maxX = Math.max(cx, ex), minY = Math.min(cy, ey), maxY = Math.max(cy, ey);
+    if (maxX < m) cx += m - maxX; if (minX > stageW - m) cx -= minX - (stageW - m);
+    if (maxY < m) cy += m - maxY; if (minY > stageH - m) cy -= minY - (stageH - m);
+    return;
+  }
   // keep at least part of the object on screen
   const h = Math.max(0, extentCss() / 2 - 20);
   cx = Math.min(Math.max(cx, -h), stageW + h); cy = Math.min(Math.max(cy, -h), stageH + h);
@@ -724,7 +785,11 @@ let autoFit = true;   // true until the user zooms after picking an object
 function refit() {
   zoom = 1;
   const f = view().fit;
-  if (extentCss() > f) zoom = f / extentCss();
+  if (obj.all) {               // All view: always show the whole line, Sun bottom left to Pluto top right
+    const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
+    allDir = [(r.r - r.l) / L, -(r.b - r.t) / L];
+    zoom = f / extentCss();
+  } else if (extentCss() > f) zoom = f / extentCss();
   cx = view().x; cy = homeY();
 }
 function zoomAbout(newZoom, sx, sy) {
@@ -751,6 +816,17 @@ stage.addEventListener("pointermove", e => {
   last = g;
 });
 const endPt = e => { pts.delete(e.pointerId); last = gestureState(); };
+// a quick tap without dragging (used by the All view's connector lines)
+let tapStart = null;
+stage.addEventListener("pointerdown", e => { tapStart = pts.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 } : null; });
+stage.addEventListener("pointermove", e => { if (tapStart) tapStart.moved = Math.max(tapStart.moved, Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y)); });
+stage.addEventListener("pointerup", e => {
+  const t = tapStart; tapStart = null;
+  if (!t || t.moved > 8 || performance.now() - t.t > 500 || !obj.all) return;
+  const [x, y] = localXY(e);
+  selSeg = hitSegment(x, y);
+  if (selSeg >= 0) allHintStep = 2;
+});
 stage.addEventListener("pointerup", endPt); stage.addEventListener("pointercancel", endPt);
 stage.addEventListener("wheel", e => { e.preventDefault(); anim = null; const [x, y] = localXY(e); zoomAbout(zoom * Math.exp(-e.deltaY * 0.0025), x, y); }, { passive: false });
 ["gesturestart","gesturechange","gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault()));
@@ -782,7 +858,7 @@ document.getElementById("btnTrue").addEventListener("click", () => animateTo(1))
 
 // ---------- Selection + static readouts ----------
 function selectObject(o) {
-  obj = o; zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
+  obj = o; selSeg = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
   document.querySelectorAll(".chip, .tchip").forEach(c => c.setAttribute("aria-pressed", c.dataset.id === o.id));
   closeDrop();
   const tc = document.getElementById("tchip-" + o.id);
@@ -798,6 +874,23 @@ function selectObject(o) {
 function refreshStatic() {
   const o = obj;
   document.getElementById("pName").textContent = o.name;
+  // All view swaps in its own stats and buttons
+  document.getElementById("statsAll").hidden = !o.all;
+  document.getElementById("statsOne").hidden = !!o.all;
+  document.getElementById("btnTrue").hidden = !!o.all;
+  document.getElementById("tTrue").hidden = !!o.all;
+  document.getElementById("btnFill").textContent = o.all ? "Show all" : "Zoom to fill";
+  document.getElementById("tFill").textContent = o.all ? "Show all" : "Fill";
+  zoomVal.classList.toggle("nts", !!o.all);
+  if (o.all) {
+    document.getElementById("pLike").textContent = "Sizes enlarged; spacing to scale";
+    document.getElementById("aSpan").textContent = fmtFt(ALL_AU * FT_PER_AU);
+    document.getElementById("aTrip").textContent = fmtTrip(ALL_AU);
+    document.getElementById("aCount").textContent = ALL_LIST.length;
+    document.getElementById("aGap").textContent = fmtFt(ALL_AU * FT_PER_AU / (ALL_LIST.length - 1));
+    refreshAbout(o);
+    return;
+  }
   const km = mainKm(), din = km * IN_PER_KM;
   const like = likeText(din * 25.4);
   document.getElementById("pLike").innerHTML = like.q.replace(/^./, c => c.toUpperCase()) + " <b>" + like.what + "</b>";
@@ -808,9 +901,15 @@ function refreshStatic() {
   document.getElementById("sReal").innerHTML = o.group
     ? Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi"
     : Math.round(o.km * 0.621371).toLocaleString() + " mi";
+  refreshAbout(o);
+}
+function refreshAbout(o) {
   const kmPerIn = 1 / IN_PER_KM;
   const sec = (title, html) => "<section><h3>" + title + "</h3><p>" + html + "</p></section>";
   document.getElementById("aboutBody").innerHTML =
+    (o.all ? sec("All view", "Every object is drawn the same size, so sizes here are not to scale. Their spacing is: each sits at its " +
+      "average distance from the Sun along one line, so the inner planets crowd together near the Sun. Pinch to spread them out. " +
+      "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
     sec("Scale", "Pluto is <b>" + fmtScale() + "</b> from the Sun (its average distance, 39.5 times Earth's). Everything else is scaled from that: " +
       "<b>1 inch = " + Math.round(kmPerIn * 0.621371).toLocaleString() + " miles</b> of real space. Change it with the gear icon.") +
     sec("True size", "At \u00d71, objects are drawn at their actual size in the model, using your screen's pixel density " +
@@ -819,7 +918,7 @@ function refreshStatic() {
       "(same side of the Sun) to farthest (opposite sides), treating orbits as circles. The Moon uses its real closest and farthest distance from Earth.") +
     sec("Travel times", "Times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
       "Real trips are slower, since spacecraft follow curved paths.") +
-    (o.group ? sec("Asteroid belt", "The belt is shown by its largest member, Ceres, at the belt's average distance. Its surface map is approximate.") : "") +
+    (o.group || o.all ? sec("Asteroid belt", "The belt is shown by its largest member, Ceres, at the belt's average distance. Its surface map is approximate.") : "") +
     sec("Surface maps", 'From <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0. ' +
       "Earth's colors were adjusted, and Pluto's never-photographed southern region is filled in.");
   for (const k in cache) delete cache[k];
@@ -835,10 +934,11 @@ const distSel = document.getElementById("distRef"), distRefLabel = document.getE
 const MOON_AU = 384400 / AU_KM;   // average Earth-Moon distance
 const auSpan = o => o.sun ? [0, 0] : o.id === "moon" ? [1 - MOON_AU, 1 + MOON_AU] : [o.au, o.au];
 function renderDist() {
+  if (obj.all) return;
   if (!distRefChosen) distRefId = "sun";                           // default: measure from the Sun
   if (distRefId === obj.id) distRefId = obj.id === "sun" ? "earth" : "sun";
   const ref = OBJECTS.find(o => o.id === distRefId);
-  distSel.innerHTML = OBJECTS.filter(o => o.id !== obj.id)
+  distSel.innerHTML = OBJECTS.filter(o => !o.all && o.id !== obj.id)
     .map(o => `<option value="${o.id}"${o.id === distRefId ? " selected" : ""}>${o.name}</option>`).join("");
   distRefLabel.textContent = ref.name;
   const A = auSpan(obj), B = auSpan(ref);
@@ -920,7 +1020,8 @@ function drawOverlay(t) {
   ctx.clearRect(0, 0, stageW, stageH);
   ctx.font = MONO;
   const ext = extentCss();
-  if (ext < 16) {
+  if (obj.all) drawAllOverlay();
+  else if (ext < 16) {
     const pulse = reduceMotion ? 0 : (Math.sin(t / 380) + 1) * 2;
     const h = Math.max(14, ext / 2 + 8) + pulse, arm = 6;
     ctx.strokeStyle = "rgba(255,184,77,0.9)"; ctx.lineWidth = 1.5;
@@ -942,7 +1043,7 @@ function drawOverlay(t) {
     }
   }
   // companion (Moon next to Earth, or Earth next to the Moon)
-  for (const b of bodiesOf(obj)) {
+  if (!obj.all) for (const b of bodiesOf(obj)) {
     if (!b.companion) continue;
     const k = pxPerKm(), sx = cx + b.xKm * k, sy = cy + b.yKm * k, r = b.radKm * k;
     const sep = Math.hypot(sx - cx, sy - cy);
@@ -976,6 +1077,62 @@ function drawOverlay(t) {
   ctx.fillText("1 in = " + mi + (miles === 1 ? " mile" : " miles"), x0, y0 - 9);
 }
 
+// All view: connector lines between neighbors, name labels, and the tapped line's popup
+let selSeg = -1, allHintStep = 0;   // hint: 0 = "pinch", 1 = "tap a line", 2 = done
+function segEnds(p, q) {            // the visible part of the line between two neighbors (outside both icons)
+  const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), gap = ICON_R + 5;
+  if (d < 2 * gap + 6) return null;
+  const ux = dx / d, uy = dy / d;
+  return [p.x + ux * gap, p.y + uy * gap, q.x - ux * gap, q.y - uy * gap];
+}
+function hitSegment(x, y) {
+  const P = placements(); let best = -1, bd = 18;
+  for (let i = 0; i < P.length - 1; i++) {
+    const e = segEnds(P[i], P[i + 1]); if (!e) continue;
+    const vx = e[2] - e[0], vy = e[3] - e[1], len2 = vx * vx + vy * vy;
+    const t = Math.max(0, Math.min(1, ((x - e[0]) * vx + (y - e[1]) * vy) / len2));
+    const d = Math.hypot(x - (e[0] + vx * t), y - (e[1] + vy * t));
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+const segPop = document.getElementById("segPop");
+function drawAllOverlay() {
+  const P = placements();
+  for (let i = 0; i < P.length - 1; i++) {
+    const e = segEnds(P[i], P[i + 1]); if (!e) continue;
+    const on = i === selSeg;
+    ctx.strokeStyle = on ? "rgba(255,184,77,0.95)" : "rgba(255,184,77,0.45)";
+    ctx.lineWidth = on ? 2.5 : 1.5;
+    ctx.setLineDash(on ? [] : [4, 5]);
+    ctx.beginPath(); ctx.moveTo(e[0], e[1]); ctx.lineTo(e[2], e[3]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = on ? "rgba(255,184,77,1)" : "rgba(255,184,77,0.7)";   // small dot marks the line as tappable
+    ctx.beginPath(); ctx.arc((e[0] + e[2]) / 2, (e[1] + e[3]) / 2, on ? 3.5 : 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // names under each object, skipping ones that would collide with the previous label
+  ctx.fillStyle = "rgba(236,239,246,0.85)"; ctx.textAlign = "center";
+  let lx = -1e9, ly = -1e9;
+  for (const p of P) {
+    if (p.x < -40 || p.x > stageW + 40 || p.y < -20 || p.y > stageH + 20) continue;
+    if (Math.hypot(p.x - lx, p.y - ly) < 40) continue;
+    ctx.fillText(p.o.short || p.o.name, p.x, p.y + ICON_R + 13);
+    lx = p.x; ly = p.y;
+  }
+  // popup for the tapped line, kept beside the line's midpoint
+  const e = selSeg >= 0 ? segEnds(P[selSeg], P[selSeg + 1]) : null;
+  if (!e) { segPop.hidden = true; return; }
+  const a = P[selSeg].o, b = P[selSeg + 1].o, au = b.au - a.au;
+  setText(document.getElementById("segName"), "sn", a.name + " \u2192 " + b.name);
+  setText(document.getElementById("segVal"), "sv", fmtFt(au * FT_PER_AU) + " \u00b7 " + fmtTrip(au));
+  segPop.hidden = false;
+  const mx = (e[0] + e[2]) / 2, my = (e[1] + e[3]) / 2, w = segPop.offsetWidth, h = segPop.offsetHeight;
+  // the line runs bottom left to top right, so the space above-left of it is empty: put the popup there
+  const px = Math.min(Math.max(mx - w - 10, 8), stageW - w - 8);
+  const py = Math.min(Math.max(my - h - 10, hudBottom + 4), stageH - h - 8);
+  segPop.style.transform = "translate(" + Math.round(px) + "px," + Math.round(py) + "px)";
+}
+
 // ---------- Frame loop ----------
 const t0 = performance.now();
 function frame(now) {
@@ -991,14 +1148,14 @@ function frame(now) {
   gl.disable(gl.SCISSOR_TEST);
   gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.enable(gl.SCISSOR_TEST);
-  const kpx = pxPerKm() * dpr;   // device px per km
-  for (const b of bodiesOf(obj)) {
-    const tx = tex[b.texName];
+  for (const p of placements()) {
+    const b = p.b, tx = tex[b.texName];
     if (!tx || (b.ring && !ringTex)) continue;
-    const R = b.radKm * kpx;                       // equatorial radius in device pixels
+    const R = p.R * dpr;                           // equatorial radius in device pixels
     // Rule: a body narrower than one screen pixel lights nothing. Below that the screen stays black.
-    if (2 * R * Math.min(b.ax[0], b.ax[1]) < 1) continue;
-    const pcx = (cx + b.xKm * pxPerKm()) * dpr, pcy = (stageH - (cy + b.yKm * pxPerKm())) * dpr;
+    // (The All view draws every object at a fixed icon size, so the rule doesn't apply there.)
+    if (!obj.all && 2 * R * Math.min(b.ax[0], b.ax[1]) < 1) continue;
+    const pcx = p.x * dpr, pcy = (stageH - p.y) * dpr;
     const reach = R * (b.ring ? RING_OUT : b.sun ? 1.5 : 1) + 2;
     const x0 = Math.max(0, Math.floor(pcx - reach)), y0 = Math.max(0, Math.floor(pcy - reach));
     const x1 = Math.min(glc.width, Math.ceil(pcx + reach)), y1 = Math.min(glc.height, Math.ceil(pcy + reach));
@@ -1022,6 +1179,7 @@ function frame(now) {
   drawOverlay(now);
 
   // live readouts
+  if (obj.all) { allReadouts(); requestAnimationFrame(frame); return; }
   setText(zoomVal, "z", fmtZoom(zoom));
   setText(zoomLab, "zl", (anim || now < zoomShownUntil) && lastZoomSecs > 0.05
     ? (anim ? "zooming \u00b7 " : "zoom took ") + lastZoomSecs.toFixed(1) + " s"
@@ -1040,6 +1198,18 @@ function frame(now) {
   hint.hidden = !showHint;
   if (showHint) setText(hint, "h", !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
   requestAnimationFrame(frame);
+}
+
+function allReadouts() {
+  setText(zoomVal, "z", "NOT TO SCALE");
+  setText(zoomLab, "zl", "sizes enlarged");
+  const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
+  const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft", yd: "yd", mi: "mile" }[scaleUnit] + "</b> model";
+  setText(equiv, "eq", "Spacing to scale: your screen spans <b>" + fmtLen(stageW / ppi / zoom) + "</b> of " + model + ".");
+  if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time");
+  if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
+  hint.hidden = allHintStep >= 2;
+  if (!hint.hidden) setText(hint, "h", allHintStep === 0 ? "Pinch to spread out the inner planets" : "Tap a line for distance and travel time");
 }
 
 // ---------- Full-screen viewing mode ----------
