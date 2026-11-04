@@ -905,7 +905,8 @@ stage.addEventListener("pointerup", e => {
   // an object takes priority over the line next to it
   selBody = hitBody(x, y);
   selSeg = selBody >= 0 ? -1 : hitSegment(x, y);
-  if (selSeg >= 0 || selBody >= 0) allHintStep = 2;
+  selOrbit = selBody >= 0 || selSeg >= 0 ? -1 : hitOrbit(x, y);   // Orbits view: a tap on an orbit circle
+  if (selSeg >= 0 || selBody >= 0 || selOrbit >= 0) allHintStep = 2;
 });
 stage.addEventListener("pointerup", endPt); stage.addEventListener("pointercancel", endPt);
 stage.addEventListener("wheel", e => { e.preventDefault(); anim = null; const [x, y] = localXY(e); zoomAbout(zoom * Math.exp(-e.deltaY * 0.0025), x, y); }, { passive: false });
@@ -972,7 +973,7 @@ const auOf = id => OBJECTS.find(o => o.id === id).au;
 // Locations: date picker (defaults to today)
 const dateInput = document.getElementById("mapDate");
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-function useDate(d) { setMapDate(d); dateInput.value = ymd(d); selSeg = -1; for (const k in cache) delete cache[k]; }
+function useDate(d) { setMapDate(d); dateInput.value = ymd(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
 dateInput.value = ymd(new Date());
 dateInput.addEventListener("change", () => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput.value);
@@ -992,7 +993,7 @@ document.getElementById("btnTrue").addEventListener("click", () => animateTo(1))
 
 // ---------- Selection + static readouts ----------
 function selectObject(o) {
-  obj = o; selSeg = -1; selBody = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
+  obj = o; selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
   document.querySelectorAll(".chip, .tchip").forEach(c => c.setAttribute("aria-pressed", c.dataset.id === o.id));
   closeDrop();
   const tc = document.getElementById("tchip-" + o.id);
@@ -1049,7 +1050,7 @@ function refreshAbout(o) {
       "object's average distance from the Sun, so orbit sizes are to scale, and each object sits where it is along its orbit on that " +
       "date, worked out from published orbital elements (Ceres's position is approximate). Objects are drawn the same size, so sizes " +
       "are not to scale. The dashed line straight up from the Sun crosses every orbit; tap a piece of it to see the distance between " +
-      "those two orbits and the Starship travel time.") :
+      "those two orbits and the Starship travel time, or tap an orbit itself to see its distance and travel time from the Sun.") :
      o.all ? sec("Distances view", "Every object is drawn the same size, so sizes here are not to scale. Their distances are: each sits at its " +
       "average distance from the Sun along one line, so the inner planets crowd together near the Sun. Pinch to spread them out. " +
       "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
@@ -1221,7 +1222,7 @@ function drawOverlay(t) {
 }
 
 // All view: connector lines between neighbors, name labels, and the tapped line's popup
-let selSeg = -1, selBody = -1, allHintStep = 0;   // hint: 0 = "pinch", 1 = "tap a line", 2 = done
+let selSeg = -1, selBody = -1, selOrbit = -1, selOrbitAng = 0, allHintStep = 0;   // hint: 0 = "pinch", 1 = "tap a line", 2 = done
 // piece i of the tappable line: between neighbors i and i+1 (Distances), or between their orbits straight
 // up from the Sun (Orbits)
 function segAt(P, i) {
@@ -1238,6 +1239,17 @@ function segEnds(p, q) {            // the visible part of the line between two 
   if (d < 2 * gap + 6) return null;
   const ux = dx / d, uy = dy / d;
   return [p.x + ux * gap, p.y + uy * gap, q.x - ux * gap, q.y - uy * gap];
+}
+function hitOrbit(x, y) {          // Orbits view: the orbit circle passing nearest the tap
+  if (!obj.map) return -1;
+  const P = placements(), perAU = AU_KM * pxPerKm(), d = Math.hypot(x - cx, y - cy);
+  let best = -1, bd = 12;
+  P.forEach((p, i) => {
+    const r = p.o.au * perAU;
+    if (r > ICON_R + 6 && Math.abs(d - r) < bd) { bd = Math.abs(d - r); best = i; }
+  });
+  if (best >= 0) selOrbitAng = Math.atan2(y - cy, x - cx);
+  return best;
 }
 function hitBody(x, y) {           // nearest object whose icon was touched
   const P = placements(); let best = -1, bd = ICON_R + 6;
@@ -1261,11 +1273,13 @@ function drawAllOverlay() {
   if (obj.map) {               // faint circular orbits around the Sun
     const perAU = AU_KM * pxPerKm();
     ctx.strokeStyle = "rgba(150,160,185,0.28)"; ctx.lineWidth = 1;
-    for (const p of P) {
+    P.forEach((p, i) => {
       const r = p.o.au * perAU;
-      if (!r) continue;
+      if (!r) return;
+      const on = i === selOrbit;               // the tapped orbit is drawn in amber
+      ctx.strokeStyle = on ? "rgba(255,184,77,0.9)" : "rgba(150,160,185,0.28)"; ctx.lineWidth = on ? 2 : 1;
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-    }
+    });
   }
   for (let i = 0; i < P.length - 1; i++) {
     const e = segAt(P, i); if (!e) continue;
@@ -1303,6 +1317,14 @@ function drawAllOverlay() {
     setText(note, "snote", like.q.replace(/^./, c => c.toUpperCase()) + " " + like.what);
     note.hidden = false;
     mx = p.x - ICON_R; my = p.y - ICON_R;
+  } else if (selOrbit >= 0) {
+    // an orbit's distance from the Sun (its average distance) and the travel time from the Sun
+    const o = P[selOrbit].o, au = o.au, r = au * AU_KM * pxPerKm();
+    setText(document.getElementById("segName"), "sn", "Sun \u2192 " + (o.group ? "asteroid belt" : o.name + "'s orbit"));
+    setText(document.getElementById("segVal"), "sv", fmtFt(au * FT_PER_AU) + " \u00b7 " + fmtTrip(au));
+    setText(note, "snote", "Distance from the Sun");
+    note.hidden = false;
+    mx = cx + Math.cos(selOrbitAng) * r; my = cy + Math.sin(selOrbitAng) * r;
   } else {
     const e = selSeg >= 0 ? segAt(P, selSeg) : null;
     if (!e) { segPop.hidden = true; return; }
