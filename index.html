@@ -1269,7 +1269,7 @@ function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
   setText(zoomLab, "zl", "");
   setText(equiv, "eq", "Spacing <u>is</u> to scale");
-  if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time<br>tap a planet for size");
+  if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
   hint.hidden = allHintStep >= 2;
   if (!hint.hidden) setText(hint, "h", allHintStep === 0 ? "Pinch to spread out the inner planets" : "Tap a line for distance and travel time");
