@@ -883,7 +883,8 @@ function frameRange(auA, auB) {
   animateTo(z, r.l - allDir[0] * d, r.b - allDir[1] * d);
 }
 const auOf = id => OBJECTS.find(o => o.id === id).au;
-const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("belt")); };
+// inner planets: the Sun to Mars; outer planets: Jupiter to Pluto (the asteroid belt belongs to neither)
+const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("mars")); };
 const showOuter = () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); };
 ["btnInner", "tInner"].forEach(id => document.getElementById(id).addEventListener("click", showInner));
 ["btnOuter", "tOuter"].forEach(id => document.getElementById(id).addEventListener("click", showOuter));
