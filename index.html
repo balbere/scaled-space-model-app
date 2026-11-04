@@ -196,7 +196,6 @@ i.allic { background: none !important; border-radius: 0; }
 .daterow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .daterow label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .daterow input { font: 500 16px var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; min-width: 0; color-scheme: dark; }
-.daterow .btn { flex: 0 0 auto; padding: 8px 14px; }
 i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .app.theater .zoomval { font-size: 24px; }
 .tinfo { display: none; font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -284,8 +283,7 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
     </div>
     <div class="daterow" id="statsMap" hidden>
       <label for="mapDate">Positions on</label>
-      <input type="date" id="mapDate">
-      <button class="btn" id="mapToday" type="button">Today</button>
+      <input type="date" id="mapDate" required>
     </div>
     <div class="stats" id="statsAll" hidden>
       <div class="stat"><div class="k">Sun to Pluto</div><div class="v" id="aSpan"></div></div>
@@ -973,13 +971,20 @@ const auOf = id => OBJECTS.find(o => o.id === id).au;
 // Locations: date picker (defaults to today)
 const dateInput = document.getElementById("mapDate");
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-function useDate(d) { setMapDate(d); dateInput.value = ymd(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
-dateInput.value = ymd(new Date());
+function useDate(d) { setMapDate(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
+// "required" removes the Clear button from desktop Chrome's calendar (its Today button stays). Today's date is also the
+// field's default value, so the iPhone picker's Reset button goes back to today.
+const today = ymd(new Date());
+dateInput.value = today; dateInput.defaultValue = today;
 dateInput.addEventListener("change", () => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput.value);
-  if (m) useDate(new Date(+m[1], +m[2] - 1, +m[3], 12));
+  const m = /^(\d{4,6})-(\d{2})-(\d{2})$/.exec(dateInput.value);
+  if (!m) { dateInput.value = dateInput.defaultValue; useDate(new Date()); return; }   // emptied: back to today
+  // build the date with setFullYear: new Date(y, ...) treats years 0-99 as 1900-1999, which turned a year typed
+  // one digit at a time ("2" -> 1902) into the wrong year. The field itself is left alone while it's being typed in.
+  const d = new Date(2000, +m[2] - 1, +m[3], 12);
+  d.setFullYear(+m[1]);
+  useDate(d);
 });
-document.getElementById("mapToday").addEventListener("click", () => useDate(new Date()));
 const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("mars")); };
 const showOuter = () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); };
 ["btnInner", "tInner"].forEach(id => document.getElementById(id).addEventListener("click", showInner));
