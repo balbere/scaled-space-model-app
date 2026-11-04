@@ -116,7 +116,7 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .stat .v small { color: var(--muted); font-size: 11.5px; }
 .kpick { position: relative; display: inline-block; }
 .kref { color: var(--sun); padding-right: 11px; border-bottom: 1px dotted var(--sun-dim); background: linear-gradient(45deg, transparent 50%, var(--sun) 50%) right 3px top 40% / 4px 4px no-repeat, linear-gradient(135deg, var(--sun) 50%, transparent 50%) right 0 top 40% / 4px 4px no-repeat; }
-.daterow { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }   /* same look as the "Distance from" label */
+.daterow { white-space: nowrap; text-align: right; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }   /* same look as the "Distance from" label */
 /* the date field sits invisibly over the amber date text: tapping the text opens the phone's date picker,
    and on computers a click opens the calendar */
 .kpick input[type=date] { position: absolute; inset: -6px -4px; width: calc(100% + 8px); height: calc(100% + 12px); opacity: 0; font-size: 16px; cursor: pointer; border: 0; padding: 0; color-scheme: dark; }
@@ -282,9 +282,9 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
         </button>
       </div>
       <div class="like" id="pLike"></div>
-    </div>
-    <div class="k daterow" id="statsMap" hidden>
-      Positions on <span class="kpick"><span class="kref" id="mapDateLabel"></span><input type="date" id="mapDate" required aria-label="Date for planet positions"></span>
+      <div class="k daterow" id="statsMap" hidden>
+        Positions on <span class="kpick"><span class="kref" id="mapDateLabel"></span><input type="date" id="mapDate" required aria-label="Date for planet positions"></span>
+      </div>
     </div>
     <div class="stats" id="statsAll" hidden>
       <div class="stat"><div class="k">Sun to Pluto</div><div class="v" id="aSpan"></div></div>
@@ -1021,7 +1021,7 @@ function refreshStatic() {
   const o = obj;
   document.getElementById("pName").textContent = o.name;
   // All view swaps in its own stats and buttons
-  document.getElementById("statsAll").hidden = !o.all || !!o.map;
+  document.getElementById("statsAll").hidden = !o.all;   // Distances and Orbits share the Sun-to-Pluto stats
   document.getElementById("statsMap").hidden = !o.map;
   document.getElementById("statsOne").hidden = !!o.all;
   document.getElementById("btnTrue").hidden = !!o.all;
@@ -1035,7 +1035,6 @@ function refreshStatic() {
   zoomVal.classList.toggle("nts", !!o.all);
   if (o.all) {
     document.getElementById("pLike").textContent = "";
-    if (o.map) { refreshAbout(o); return; }
     document.getElementById("aSpan").textContent = fmtFt(ALL_AU * FT_PER_AU);
     document.getElementById("aTrip").textContent = fmtTrip(ALL_AU);
     refreshAbout(o);
