@@ -371,8 +371,9 @@ applyScale();
 // ---------- Objects ----------
 // km: diameter used for the readouts. axes: rendered radii ratios [screen x, screen y (pole), depth] for lumpy bodies.
 const OBJECTS = [
-  // "All": every object except the Moon, drawn the same size along one line, spaced by average distance from the Sun
-  { id:"all", name:"Solar System", short:"All", all:true },
+  // "Distances" view (id "all"): every object except the Moon, drawn the same size along one line,
+  // placed by average distance from the Sun
+  { id:"all", name:"Solar System", short:"Distances", all:true },
   { id:"sun", name:"Sun", tex:"sun", km:1392700, au:0, dayH:609, obl:7.25, view:6, swatch:"#ffb547", sun:true },
   { id:"mercury", name:"Mercury", tex:"mercury", km:4879,   au:0.387, dayH:1407.6, obl:0.03, view:12, swatch:"#9a9690", limb:0.0, atmo:0 },
   { id:"venus",   name:"Venus",   tex:"venus", km:12104,  au:0.723, dayH:-96,    obl:2.6,  view:10, swatch:"#e3c98f", limb:0.35, atmo:0.25, atmoCol:[1,0.9,0.7] },
@@ -950,7 +951,7 @@ function refreshAbout(o) {
   const kmPerIn = 1 / IN_PER_KM;
   const sec = (title, html) => "<section><h3>" + title + "</h3><p>" + html + "</p></section>";
   document.getElementById("aboutBody").innerHTML =
-    (o.all ? sec("All view", "Every object is drawn the same size, so sizes here are not to scale. Their spacing is: each sits at its " +
+    (o.all ? sec("Distances view", "Every object is drawn the same size, so sizes here are not to scale. Their distances are: each sits at its " +
       "average distance from the Sun along one line, so the inner planets crowd together near the Sun. Pinch to spread them out. " +
       "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
     sec("Scale", "Pluto is <b>" + fmtScale() + "</b> from the Sun (its average distance, 39.5 times Earth's). Everything else is scaled from that: " +
@@ -1271,7 +1272,7 @@ function frame(now) {
 function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
   setText(zoomLab, "zl", "");
-  setText(equiv, "eq", "Spacing <u>is</u> to scale");
+  setText(equiv, "eq", "Distances <u>are</u> to scale");
   if (theater()) setText(tInfo, "ti", "<b>Solar System</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
   hint.hidden = allHintStep >= 2;
