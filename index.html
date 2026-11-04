@@ -381,9 +381,9 @@ applyScale();
 // ---------- Objects ----------
 // km: diameter used for the readouts. axes: rendered radii ratios [screen x, screen y (pole), depth] for lumpy bodies.
 const OBJECTS = [
-  // "Locations" view: the same objects seen from above, on circular orbits at their average distance from the Sun,
+  // "Orbits" view (id "map"): the same objects seen from above, on circular orbits at their average distance from the Sun,
   // each placed where it is along its orbit on the chosen date (all:true shares the Distances view's machinery)
-  { id:"map", name:"Locations", short:"Locations", all:true, map:true },
+  { id:"map", name:"Orbits", short:"Orbits", all:true, map:true },
   // "Distances" view (id "all"): every object except the Moon, drawn the same size along one line,
   // placed by average distance from the Sun
   { id:"all", name:"Distances", short:"Distances", all:true },
@@ -1014,9 +1014,9 @@ function refreshStatic() {
   document.getElementById("statsOne").hidden = !!o.all;
   document.getElementById("btnTrue").hidden = !!o.all;
   document.getElementById("btnInner").hidden = !o.all;
-  document.getElementById("btnOuter").hidden = !o.all;
+  document.getElementById("btnOuter").hidden = !o.all || !!o.map;   // in Orbits, Show all already frames the outer planets
   document.getElementById("tInner").hidden = !o.all;
-  document.getElementById("tOuter").hidden = !o.all;
+  document.getElementById("tOuter").hidden = !o.all || !!o.map;
   document.getElementById("tTrue").hidden = !!o.all;
   document.getElementById("btnFill").textContent = o.all ? "Show all" : "Zoom to fill";
   document.getElementById("tFill").textContent = o.all ? "Show all" : "Fill";
@@ -1045,10 +1045,11 @@ function refreshAbout(o) {
   const kmPerIn = 1 / IN_PER_KM;
   const sec = (title, html) => "<section><h3>" + title + "</h3><p>" + html + "</p></section>";
   document.getElementById("aboutBody").innerHTML =
-    (o.map ? sec("Locations view", "A view from above the solar system on the date you pick. Each orbit is drawn as a circle at the " +
+    (o.map ? sec("Orbits view", "A view from above the solar system on the date you pick. Each orbit is drawn as a circle at the " +
       "object's average distance from the Sun, so orbit sizes are to scale, and each object sits where it is along its orbit on that " +
       "date, worked out from published orbital elements (Ceres's position is approximate). Objects are drawn the same size, so sizes " +
-      "are not to scale. Tap the line between two neighbors to see how far apart they are on that date and the Starship travel time.") :
+      "are not to scale. The dashed line straight up from the Sun crosses every orbit; tap a piece of it to see the distance between " +
+      "those two orbits and the Starship travel time.") :
      o.all ? sec("Distances view", "Every object is drawn the same size, so sizes here are not to scale. Their distances are: each sits at its " +
       "average distance from the Sun along one line, so the inner planets crowd together near the Sun. Pinch to spread them out. " +
       "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
@@ -1221,6 +1222,17 @@ function drawOverlay(t) {
 
 // All view: connector lines between neighbors, name labels, and the tapped line's popup
 let selSeg = -1, selBody = -1, allHintStep = 0;   // hint: 0 = "pinch", 1 = "tap a line", 2 = done
+// piece i of the tappable line: between neighbors i and i+1 (Distances), or between their orbits straight
+// up from the Sun (Orbits)
+function segAt(P, i) {
+  if (obj.map) {
+    const perAU = AU_KM * pxPerKm(), y0 = cy - P[i].o.au * perAU, y1 = cy - P[i + 1].o.au * perAU;
+    const gap = i === 0 ? ICON_R + 5 : 2;          // start the first piece outside the Sun
+    if (y0 - y1 < gap + 8) return null;
+    return [cx, y0 - gap, cx, y1 + 2];
+  }
+  return segEnds(P[i], P[i + 1]);
+}
 function segEnds(p, q) {            // the visible part of the line between two neighbors (outside both icons)
   const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), gap = ICON_R + 5;
   if (d < 2 * gap + 6) return null;
@@ -1235,7 +1247,7 @@ function hitBody(x, y) {           // nearest object whose icon was touched
 function hitSegment(x, y) {
   const P = placements(); let best = -1, bd = 18;
   for (let i = 0; i < P.length - 1; i++) {
-    const e = segEnds(P[i], P[i + 1]); if (!e) continue;
+    const e = segAt(P, i); if (!e) continue;
     const vx = e[2] - e[0], vy = e[3] - e[1], len2 = vx * vx + vy * vy;
     const t = Math.max(0, Math.min(1, ((x - e[0]) * vx + (y - e[1]) * vy) / len2));
     const d = Math.hypot(x - (e[0] + vx * t), y - (e[1] + vy * t));
@@ -1256,7 +1268,7 @@ function drawAllOverlay() {
     }
   }
   for (let i = 0; i < P.length - 1; i++) {
-    const e = segEnds(P[i], P[i + 1]); if (!e) continue;
+    const e = segAt(P, i); if (!e) continue;
     const on = i === selSeg;
     ctx.strokeStyle = on ? "rgba(255,184,77,0.95)" : "rgba(255,184,77,0.45)";
     ctx.lineWidth = on ? 2.5 : 1.5;
@@ -1292,16 +1304,17 @@ function drawAllOverlay() {
     note.hidden = false;
     mx = p.x - ICON_R; my = p.y - ICON_R;
   } else {
-    const e = selSeg >= 0 ? segEnds(P[selSeg], P[selSeg + 1]) : null;
+    const e = selSeg >= 0 ? segAt(P, selSeg) : null;
     if (!e) { segPop.hidden = true; return; }
     const pa = P[selSeg], pb = P[selSeg + 1], a = pa.o, b = pb.o;
-    // Locations: straight-line distance between their positions on the date; Distances: gap between average distances
-    const au = obj.map ? Math.sqrt(a.au * a.au + b.au * b.au - 2 * a.au * b.au * Math.cos(pa.lon - pb.lon)) : b.au - a.au;
+    const au = b.au - a.au;       // gap between their orbits / average distances (the same in both views)
     setText(document.getElementById("segName"), "sn", a.name + " \u2192 " + b.name);
     setText(document.getElementById("segVal"), "sv", fmtFt(au * FT_PER_AU) + " \u00b7 " + fmtTrip(au));
     note.hidden = true;
     mx = (e[0] + e[2]) / 2; my = (e[1] + e[3]) / 2;
   }
+  // hide the popup while what it describes is off screen (it comes back when that's scrolled into view)
+  if (mx < 0 || mx > stageW || my < hudBottom || my > stageH) { segPop.hidden = true; return; }
   segPop.hidden = false;
   const w = segPop.offsetWidth, h = segPop.offsetHeight;
   // the line runs bottom left to top right, so the space above-left of it is empty: put the popup there
@@ -1383,7 +1396,7 @@ function allReadouts() {
   setText(zoomLab, "zl", "");
   setText(equiv, "eq", obj.map ? "Orbits <u>are</u> to scale" : "Distances <u>are</u> to scale");
   if (theater()) setText(tInfo, "ti", obj.map
-    ? "<b>Locations</b> \u00b7 " + mapDay.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
+    ? "<b>Orbits</b> \u00b7 " + mapDay.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
       " \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size"
     : "<b>Distances</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
