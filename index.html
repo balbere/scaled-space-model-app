@@ -1239,9 +1239,10 @@ let selSeg = -1, selBody = -1, selOrbit = -1, selOrbitAng = 0, allHintStep = 0; 
 function segAt(P, i) {
   if (obj.map) {
     const perAU = AU_KM * pxPerKm(), y0 = cy - P[i].o.au * perAU, y1 = cy - P[i + 1].o.au * perAU;
-    const gap = i === 0 ? ICON_R + 5 : 2;          // start the first piece outside the Sun
-    if (y0 - y1 < gap + 8) return null;
-    return [cx, y0 - gap, cx, y1 + 2];
+    // each piece is its own short line, stopping 5 px short of the orbits at both ends (the first starts outside the Sun)
+    const m = 5, g0 = i === 0 ? ICON_R + m : m;
+    if (y0 - y1 < g0 + m + 6) return null;
+    return [cx, y0 - g0, cx, y1 + m];
   }
   return segEnds(P[i], P[i + 1]);
 }
