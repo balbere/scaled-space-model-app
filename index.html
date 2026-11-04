@@ -1322,8 +1322,7 @@ function drawAllOverlay() {
     const o = P[selOrbit].o, au = o.au, r = au * AU_KM * pxPerKm();
     setText(document.getElementById("segName"), "sn", "Sun \u2192 " + (o.group ? "asteroid belt" : o.name + "'s orbit"));
     setText(document.getElementById("segVal"), "sv", fmtFt(au * FT_PER_AU) + " \u00b7 " + fmtTrip(au));
-    setText(note, "snote", "Distance from the Sun");
-    note.hidden = false;
+    note.hidden = true;
     mx = cx + Math.cos(selOrbitAng) * r; my = cy + Math.sin(selOrbitAng) * r;
   } else {
     const e = selSeg >= 0 ? segAt(P, selSeg) : null;
