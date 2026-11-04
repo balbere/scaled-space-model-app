@@ -192,6 +192,11 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .segpop small { display: block; font: 11.5px var(--font-body); color: var(--muted); margin-top: 3px; }
 .segpop span { display: block; font: 500 13px var(--font-mono); color: var(--sun); margin-top: 2px; font-variant-numeric: tabular-nums; }
 i.allic { background: none !important; border-radius: 0; }
+/* Locations view: date picker in the bottom panel */
+.daterow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.daterow label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.daterow input { font: 500 16px var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; min-width: 0; color-scheme: dark; }
+.daterow .btn { flex: 0 0 auto; padding: 8px 14px; }
 i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .app.theater .zoomval { font-size: 24px; }
 .tinfo { display: none; font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -276,6 +281,11 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
         </button>
       </div>
       <div class="like" id="pLike"></div>
+    </div>
+    <div class="daterow" id="statsMap" hidden>
+      <label for="mapDate">Positions on</label>
+      <input type="date" id="mapDate">
+      <button class="btn" id="mapToday" type="button">Today</button>
     </div>
     <div class="stats" id="statsAll" hidden>
       <div class="stat"><div class="k">Sun to Pluto</div><div class="v" id="aSpan"></div></div>
@@ -371,6 +381,9 @@ applyScale();
 // ---------- Objects ----------
 // km: diameter used for the readouts. axes: rendered radii ratios [screen x, screen y (pole), depth] for lumpy bodies.
 const OBJECTS = [
+  // "Locations" view: the same objects seen from above, on circular orbits at their average distance from the Sun,
+  // each placed where it is along its orbit on the chosen date (all:true shares the Distances view's machinery)
+  { id:"map", name:"Locations", short:"Locations", all:true, map:true },
   // "Distances" view (id "all"): every object except the Moon, drawn the same size along one line,
   // placed by average distance from the Sun
   { id:"all", name:"Distances", short:"Distances", all:true },
@@ -453,11 +466,46 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const mainKm = () => obj.group ? obj.members[0].km : obj.km;           // the body the readouts describe
 const pxPerKm = () => IN_PER_KM * ppi * zoom;                          // CSS px per real km at this zoom
 const mainDiamCss = () => mainKm() * pxPerKm();
-const extentCss = () => obj.all ? ALL_AU * AU_KM * pxPerKm()       // All view: length of the Sun-to-Pluto line
+const extentCss = () => obj.map ? 2 * ALL_AU * AU_KM * pxPerKm()  // Locations: width of Pluto's orbit
+  : obj.all ? ALL_AU * AU_KM * pxPerKm()       // All view: length of the Sun-to-Pluto line
   : obj.group ? obj.extentKm * pxPerKm() : mainDiamCss() * (obj.ring ? RING_OUT : 1);
 
 // ---------- All view geometry ----------
 const ALL_LIST = OBJECTS.filter(o => !o.all && o.id !== "moon");   // Sun ... Pluto, in order
+
+// ---------- Locations view: where each object is along its orbit on a date ----------
+// Mean longitude at J2000 (deg) and its rate (deg per century), eccentricity, longitude of perihelion (deg):
+// JPL's approximate planetary elements (Standish). Ceres from its 2022-12 perihelion; approximate.
+const ORBIT = {
+  mercury: [252.25032350, 149472.67411175, 0.20563593, 77.45779628],
+  venus:   [181.97909950,  58517.81538729, 0.00677672, 131.60246718],
+  earth:   [100.46457166,  35999.37244981, 0.01671123, 102.93768193],
+  mars:    [ -4.55343205,  19140.30268499, 0.09339410, -23.94362959],
+  belt:    [160.86,         7819.3,        0.0785,     153.9],
+  jupiter: [ 34.39644051,   3034.74612775, 0.04838624,  14.72847983],
+  saturn:  [ 49.95424423,   1222.49362201, 0.05386179,  92.59887831],
+  uranus:  [313.23810451,    428.48202785, 0.04725744, 170.95427630],
+  neptune: [-55.12002969,    218.45945325, 0.00859048,  44.96476227],
+  pluto:   [238.92903833,    145.20780515, 0.24882730, 224.06891629],
+};
+const RAD = Math.PI / 180;
+// heliocentric longitude (radians) on the date: Kepler's equation gives the true position along the orbit;
+// the app then draws that direction on a circle at the average distance
+function longitudeOn(id, date) {
+  const el = ORBIT[id]; if (!el) return 0;
+  const T = (date.getTime() / 86400000 + 2440587.5 - 2451545) / 36525;
+  const e = el[2], M = ((el[0] + el[1] * T - el[3]) % 360) * RAD;
+  let E = M; for (let i = 0; i < 8; i++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+  return nu + el[3] * RAD;
+}
+const mapLong = {};
+let mapDay = new Date();
+function setMapDate(d) {
+  mapDay = d;
+  ALL_LIST.forEach(o => { mapLong[o.id] = longitudeOn(o.id, d); });
+}
+setMapDate(new Date());
 const ALL_AU = 39.5;           // Sun to Pluto
 const ICON_R = 13;             // radius of every object in the All view, CSS px (same size on screen at any zoom)
 let allDir = [0.6, -0.8];      // unit direction of the line, bottom left to top right
@@ -470,6 +518,10 @@ function allRect() {           // where the line runs when the whole model is sh
 // screen position and size of each body drawn this frame
 function placements() {
   const k = pxPerKm();
+  if (obj.map) return ALL_LIST.map(o => {        // seen from above: longitude 0 to the right, orbits counterclockwise
+    const d = o.au * AU_KM * k, a = mapLong[o.id] || 0;
+    return { b: bodiesOf(o)[0], o, x: cx + Math.cos(a) * d, y: cy - Math.sin(a) * d, R: ICON_R, lon: a };
+  });
   if (obj.all) return ALL_LIST.map(o => {
     const d = o.au * AU_KM * k;
     return { b: bodiesOf(o)[0], o, x: cx + allDir[0] * d, y: cy + allDir[1] * d, R: ICON_R };
@@ -488,6 +540,14 @@ const ROCK_ICON = '<i class="belt"><svg viewBox="2 2 16 16" aria-hidden="true">'
   '<ellipse cx="7.8" cy="12.4" rx="2" ry="1.5" fill="#2f2b27" opacity=".75"/>' +
   '<ellipse cx="13.8" cy="13.2" rx="1" ry=".8" fill="#2f2b27" opacity=".75"/>' +
   '<ellipse cx="7.3" cy="8.8" rx=".7" ry=".55" fill="#4f4943" opacity=".8"/>' +
+  '</svg></i>';
+// "Locations": the Sun in the middle with two circular orbits and a planet on each (flat colors, no gradients)
+const MAP_ICON = '<i class="allic"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none">' +
+  '<circle cx="10" cy="10" r="5" stroke="#59627a" stroke-width="0.9"/>' +
+  '<circle cx="10" cy="10" r="8.6" stroke="#59627a" stroke-width="0.9"/>' +
+  '<circle cx="10" cy="10" r="2.4" fill="#ffb547"/>' +
+  '<circle cx="13.5" cy="6.5" r="1.4" fill="#4a7fd6"/>' +
+  '<circle cx="2.4" cy="14.3" r="1.7" fill="#c9a27a"/>' +
   '</svg></i>';
 // "Distances": the Sun and planets as dots along one straight diagonal, like the view itself (flat colors, no gradients)
 const ALL_ICON = '<i class="allic"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none">' +
@@ -512,7 +572,7 @@ const theater = () => app.classList.contains("theater");
 OBJECTS.forEach(o => {
   const b = document.createElement("button");
   b.className = "chip"; b.type = "button"; b.id = "chip-" + o.id; b.dataset.id = o.id;
-  const sw = o.all ? ALL_ICON : o.group ? ROCK_ICON
+  const sw = o.map ? MAP_ICON : o.all ? ALL_ICON : o.group ? ROCK_ICON
     : o.sun ? '<i style="background:radial-gradient(circle at 50% 50%, #fff3c4, #ffb547 55%, #c25d10 100%)"></i>'
     : `<i style="background:radial-gradient(circle at 35% 35%, ${o.swatch}, #000 120%)"></i>`;
   b.innerHTML = sw + (o.short || o.name);
@@ -669,6 +729,7 @@ const BG = {
   neptune: { c: ["#3a5cff", "#2a3aa0", "#7a9aff"], a: 0.05, stars: 1.3 },
   pluto:   { c: ["#6a5a8a", "#3a3050", "#a08ac0"], a: 0.03, stars: 1.6 },
   all:     { c: ["#ffb547", "#4a7fd6", "#b47cff", "#5fd4c4"], a: 0.035, stars: 1.4 },
+  map:     { c: ["#5fd4c4", "#ffb547", "#7a9aff", "#c9a27a"], a: 0.03, stars: 1.5 },
 };
 function rngFor(str) {
   let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
@@ -729,6 +790,10 @@ function drawBackground() {
 const stage = document.getElementById("stage");
 // usable viewing area: in full-screen mode the picker column takes the right edge
 function view() {
+  if (obj.map) {               // Locations: the Sun in the middle; "fit" is the widest circle that fits
+    const r = allRect();
+    return { x: (r.l + r.r) / 2, y: (r.t + r.b) / 2, fit: Math.min(r.r - r.l, r.b - r.t) };
+  }
   if (obj.all) {               // All view: anchor is the Sun at the bottom-left end; "fit" is the line's length
     const r = allRect();
     return { x: r.l, y: r.b, fit: Math.hypot(r.r - r.l, r.b - r.t) };
@@ -773,6 +838,11 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 
 function clampCenter() {
+  if (obj.map) {               // keep part of Pluto's orbit on screen
+    const h = extentCss() / 2 - 30;
+    cx = Math.min(Math.max(cx, -h), stageW + h); cy = Math.min(Math.max(cy, -h), stageH + h);
+    return;
+  }
   if (obj.all) {               // keep part of the line on screen
     const E = extentCss(), ex = cx + allDir[0] * E, ey = cy + allDir[1] * E, m = 30;
     const minX = Math.min(cx, ex), maxX = Math.max(cx, ex), minY = Math.min(cy, ey), maxY = Math.max(cy, ey);
@@ -792,7 +862,8 @@ let autoFit = true;   // true until the user zooms after picking an object
 function refit() {
   zoom = 1;
   const f = view().fit;
-  if (obj.all) {               // All view: always show the whole line, Sun bottom left to Pluto top right
+  if (obj.map) zoom = f / extentCss();         // Locations: always show Pluto's whole orbit
+  else if (obj.all) {          // All view: always show the whole line, Sun bottom left to Pluto top right
     const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
     allDir = [(r.r - r.l) / L, -(r.b - r.t) / L];
     zoom = f / extentCss();
@@ -864,12 +935,17 @@ function animateTo(targetZoom, tx, ty) {
 }
 // All view: which stretch of the solar system (in AU from the Sun) the corner-to-corner diagonal currently covers
 function currentAllRange() {
+  if (obj.map) return [0, view().fit / 2 / (AU_KM * pxPerKm())];   // Locations: radius in view
   const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t), perAU = AU_KM * pxPerKm();
   const a = ((r.l - cx) * allDir[0] + (r.b - cy) * allDir[1]) / perAU;
   return [a, a + L / perAU];
 }
 // show a stretch instantly, re-angling the line to run corner to corner on the current screen
 function setAllRange(auA, auB) {
+  if (obj.map) {               // Locations: show the same radius, Sun centered on the new screen
+    zoom = view().fit / 2 / (auB * AU_KM * IN_PER_KM * ppi); cx = view().x; cy = view().y;
+    return;
+  }
   const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
   if (!(auB > auA) || !(L > 0)) return;
   allDir = [(r.r - r.l) / L, -(r.b - r.t) / L];
@@ -880,6 +956,11 @@ function setAllRange(auA, auB) {
 let pendingAllRange = null;   // captured just before the screen layout changes (entering or leaving full screen)
 // All view: zoom so the stretch from one distance to another (in AU) fills the line, nearer end at bottom left
 function frameRange(auA, auB) {
+  if (obj.map) {               // Locations: Sun centered, with the outer object's orbit just fitting
+    const v = view();
+    animateTo(v.fit / 2 / (auB * AU_KM * IN_PER_KM * ppi), v.x, v.y);
+    return;
+  }
   const r = allRect(), L = Math.hypot(r.r - r.l, r.b - r.t);
   allDir = [(r.r - r.l) / L, -(r.b - r.t) / L];
   const z = L / ((auB - auA) * AU_KM * IN_PER_KM * ppi);
@@ -888,6 +969,16 @@ function frameRange(auA, auB) {
 }
 const auOf = id => OBJECTS.find(o => o.id === id).au;
 // inner planets: the Sun to Mars; outer planets: Jupiter to Pluto (the asteroid belt belongs to neither)
+// Locations: date picker (defaults to today)
+const dateInput = document.getElementById("mapDate");
+const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+function useDate(d) { setMapDate(d); dateInput.value = ymd(d); selSeg = -1; for (const k in cache) delete cache[k]; }
+dateInput.value = ymd(new Date());
+dateInput.addEventListener("change", () => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput.value);
+  if (m) useDate(new Date(+m[1], +m[2] - 1, +m[3], 12));
+});
+document.getElementById("mapToday").addEventListener("click", () => useDate(new Date()));
 const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("mars")); };
 const showOuter = () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); };
 ["btnInner", "tInner"].forEach(id => document.getElementById(id).addEventListener("click", showInner));
@@ -918,7 +1009,8 @@ function refreshStatic() {
   const o = obj;
   document.getElementById("pName").textContent = o.name;
   // All view swaps in its own stats and buttons
-  document.getElementById("statsAll").hidden = !o.all;
+  document.getElementById("statsAll").hidden = !o.all || !!o.map;
+  document.getElementById("statsMap").hidden = !o.map;
   document.getElementById("statsOne").hidden = !!o.all;
   document.getElementById("btnTrue").hidden = !!o.all;
   document.getElementById("btnInner").hidden = !o.all;
@@ -931,6 +1023,7 @@ function refreshStatic() {
   zoomVal.classList.toggle("nts", !!o.all);
   if (o.all) {
     document.getElementById("pLike").textContent = "";
+    if (o.map) { refreshAbout(o); return; }
     document.getElementById("aSpan").textContent = fmtFt(ALL_AU * FT_PER_AU);
     document.getElementById("aTrip").textContent = fmtTrip(ALL_AU);
     refreshAbout(o);
@@ -952,7 +1045,11 @@ function refreshAbout(o) {
   const kmPerIn = 1 / IN_PER_KM;
   const sec = (title, html) => "<section><h3>" + title + "</h3><p>" + html + "</p></section>";
   document.getElementById("aboutBody").innerHTML =
-    (o.all ? sec("Distances view", "Every object is drawn the same size, so sizes here are not to scale. Their distances are: each sits at its " +
+    (o.map ? sec("Locations view", "A view from above the solar system on the date you pick. Each orbit is drawn as a circle at the " +
+      "object's average distance from the Sun, so orbit sizes are to scale, and each object sits where it is along its orbit on that " +
+      "date, worked out from published orbital elements (Ceres's position is approximate). Objects are drawn the same size, so sizes " +
+      "are not to scale. Tap the line between two neighbors to see how far apart they are on that date and the Starship travel time.") :
+     o.all ? sec("Distances view", "Every object is drawn the same size, so sizes here are not to scale. Their distances are: each sits at its " +
       "average distance from the Sun along one line, so the inner planets crowd together near the Sun. Pinch to spread them out. " +
       "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
     sec("Scale", "Pluto is <b>" + fmtScale() + "</b> from the Sun (its average distance, 39.5 times Earth's). Everything else is scaled from that: " +
@@ -1149,6 +1246,15 @@ function hitSegment(x, y) {
 const segPop = document.getElementById("segPop");
 function drawAllOverlay() {
   const P = placements();
+  if (obj.map) {               // faint circular orbits around the Sun
+    const perAU = AU_KM * pxPerKm();
+    ctx.strokeStyle = "rgba(150,160,185,0.28)"; ctx.lineWidth = 1;
+    for (const p of P) {
+      const r = p.o.au * perAU;
+      if (!r) continue;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
   for (let i = 0; i < P.length - 1; i++) {
     const e = segEnds(P[i], P[i + 1]); if (!e) continue;
     const on = i === selSeg;
@@ -1162,14 +1268,14 @@ function drawAllOverlay() {
   }
   // names under each object, skipping ones that would collide with the previous label
   ctx.fillStyle = "rgba(236,239,246,0.85)"; ctx.textAlign = "center";
-  let lx = -1e9, ly = -1e9;
+  const drawn = [];
   for (const p of P) {
     if (p.x < -40 || p.x > stageW + 40 || p.y < -20) continue;
     if (p.y + ICON_R + 13 > (scaleY || stageH - 22) - 20) continue;   // no names over the scale bar or buttons
-    if (Math.hypot(p.x - lx, p.y - ly) < 40) continue;
+    if (drawn.some(q => Math.hypot(p.x - q[0], p.y - q[1]) < 40)) continue;
     const name = p.o.short || p.o.name, hw = ctx.measureText(name).width / 2 + 4;
     ctx.fillText(name, Math.min(Math.max(p.x, hw), stageW - hw), p.y + ICON_R + 13);   // keep names on screen
-    lx = p.x; ly = p.y;
+    drawn.push([p.x, p.y]);
   }
   // popup for the tapped object or line
   const note = document.getElementById("segNote");
@@ -1188,7 +1294,9 @@ function drawAllOverlay() {
   } else {
     const e = selSeg >= 0 ? segEnds(P[selSeg], P[selSeg + 1]) : null;
     if (!e) { segPop.hidden = true; return; }
-    const a = P[selSeg].o, b = P[selSeg + 1].o, au = b.au - a.au;
+    const pa = P[selSeg], pb = P[selSeg + 1], a = pa.o, b = pb.o;
+    // Locations: straight-line distance between their positions on the date; Distances: gap between average distances
+    const au = obj.map ? Math.sqrt(a.au * a.au + b.au * b.au - 2 * a.au * b.au * Math.cos(pa.lon - pb.lon)) : b.au - a.au;
     setText(document.getElementById("segName"), "sn", a.name + " \u2192 " + b.name);
     setText(document.getElementById("segVal"), "sv", fmtFt(au * FT_PER_AU) + " \u00b7 " + fmtTrip(au));
     note.hidden = true;
@@ -1273,8 +1381,11 @@ function frame(now) {
 function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
   setText(zoomLab, "zl", "");
-  setText(equiv, "eq", "Distances <u>are</u> to scale");
-  if (theater()) setText(tInfo, "ti", "<b>Distances</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
+  setText(equiv, "eq", obj.map ? "Orbits <u>are</u> to scale" : "Distances <u>are</u> to scale");
+  if (theater()) setText(tInfo, "ti", obj.map
+    ? "<b>Locations</b> \u00b7 " + mapDay.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
+      " \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size"
+    : "<b>Distances</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
   hint.hidden = allHintStep >= 2;
   if (!hint.hidden) setText(hint, "h", allHintStep === 0 ? "Pinch to spread out the inner planets" : "Tap a line for distance and travel time");
