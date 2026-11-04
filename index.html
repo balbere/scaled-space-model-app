@@ -116,6 +116,11 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .stat .v small { color: var(--muted); font-size: 11.5px; }
 .kpick { position: relative; display: inline-block; }
 .kref { color: var(--sun); padding-right: 11px; border-bottom: 1px dotted var(--sun-dim); background: linear-gradient(45deg, transparent 50%, var(--sun) 50%) right 3px top 40% / 4px 4px no-repeat, linear-gradient(135deg, var(--sun) 50%, transparent 50%) right 0 top 40% / 4px 4px no-repeat; }
+.daterow { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }   /* same look as the "Distance from" label */
+/* the date field sits invisibly over the amber date text: tapping the text opens the phone's date picker,
+   and on computers a click opens the calendar */
+.kpick input[type=date] { position: absolute; inset: -6px -4px; width: calc(100% + 8px); height: calc(100% + 12px); opacity: 0; font-size: 16px; cursor: pointer; border: 0; padding: 0; color-scheme: dark; }
+.kpick input[type=date]::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
 .kpick select { position: absolute; inset: -6px -4px; width: calc(100% + 8px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
 .kpick:focus-within .kref { outline: 2px solid var(--sun); outline-offset: 2px; }
 .actions { display: flex; gap: 8px; }
@@ -193,9 +198,6 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .segpop span { display: block; font: 500 13px var(--font-mono); color: var(--sun); margin-top: 2px; font-variant-numeric: tabular-nums; }
 i.allic { background: none !important; border-radius: 0; }
 /* Locations view: date picker in the bottom panel */
-.daterow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.daterow label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.daterow input { font: 500 16px var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; min-width: 0; color-scheme: dark; }
 i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .app.theater .zoomval { font-size: 24px; }
 .tinfo { display: none; font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -281,9 +283,8 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
       </div>
       <div class="like" id="pLike"></div>
     </div>
-    <div class="daterow" id="statsMap" hidden>
-      <label for="mapDate">Positions on</label>
-      <input type="date" id="mapDate" required>
+    <div class="k daterow" id="statsMap" hidden>
+      Positions on <span class="kpick"><span class="kref" id="mapDateLabel"></span><input type="date" id="mapDate" required aria-label="Date for planet positions"></span>
     </div>
     <div class="stats" id="statsAll" hidden>
       <div class="stat"><div class="k">Sun to Pluto</div><div class="v" id="aSpan"></div></div>
@@ -971,7 +972,12 @@ const auOf = id => OBJECTS.find(o => o.id === id).au;
 // Locations: date picker (defaults to today)
 const dateInput = document.getElementById("mapDate");
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-function useDate(d) { setMapDate(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
+const dateLabel = document.getElementById("mapDateLabel");
+const showDate = d => { dateLabel.textContent = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
+function useDate(d) { setMapDate(d); showDate(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
+showDate(new Date());
+// on computers, clicking the text should open the calendar (not just select part of the hidden field)
+dateInput.addEventListener("click", () => { try { dateInput.showPicker(); } catch (e) {} });
 // "required" removes the Clear button from desktop Chrome's calendar (its Today button stays). Today's date is also the
 // field's default value, so the iPhone picker's Reset button goes back to today.
 const today = ymd(new Date());
