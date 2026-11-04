@@ -1268,13 +1268,13 @@ function hitSegment(x, y) {
   return best;
 }
 const segPop = document.getElementById("segPop");
-// Orbits view: the asteroid belt drawn as a scattered ring of small rocks between 2.2 and 3.2 AU from the Sun.
+// Orbits view: the asteroid belt drawn as a scattered ring of small rocks between 2.4 and 3.0 AU from the Sun.
 // Each rock keeps a fixed place and an on-screen size, so the ring looks the same at any zoom; Ceres is drawn on top.
 const BELT_ROCKS = (() => {
   const R = rngFor("asteroid-belt"), out = [];
   for (let i = 0; i < 2400; i++) {
     const g = (R() + R() + R() - 1.5) / 1.5;               // bunched toward the middle of the belt
-    out.push({ a: R() * Math.PI * 2, au: 2.7 + g * 0.5, size: 0.6 + Math.pow(R(), 3) * 1.9,
+    out.push({ a: R() * Math.PI * 2, au: 2.7 + g * 0.3, size: 0.6 + Math.pow(R(), 3) * 1.9,
                asp: 0.55 + R() * 0.45, rot: R() * Math.PI, shade: 120 + R() * 70 | 0 });
   }
   return out;
