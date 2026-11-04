@@ -1350,12 +1350,12 @@ const calib = document.getElementById("calib"), slider = document.getElementById
 // only the width follows the slider (it is what gets matched to the card); the height stays fixed so the sheet doesn't move
 function drawCard() { cardBox.style.width = (2.125 * ppi) + "px"; cardBox.style.height = Math.round(1.1 * IPHONE15_CSS_PPI) + "px"; }
 // Slider range, set each time the sheet opens: the right end makes the outline exactly as wide as the room it has
-// (so there is no dead zone at the end), and the left end stops at 60% of the iPhone 15 value, which covers
-// phones, tablets and laptops while keeping the range narrow enough for fine adjustment.
+// (so there is no dead zone at the end), and the left end shrinks it until its sides almost touch (5 px apart
+// inside its 2 px borders), so any screen can be matched, including large, low-resolution monitors.
 function setSliderRange() {
   const card = cardBox.parentElement, cs = getComputedStyle(card);
   const room = card.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const lo = 0.6 * IPHONE15_CSS_PPI;
+  const lo = (2 + 5 + 2) / 2.125;                  // outline 9 px wide
   const hi = Math.max(lo + 10, room / 2.125);
   slider.min = lo.toFixed(1); slider.max = hi.toFixed(1);
   slider.value = Math.min(hi, Math.max(lo, ppi));
