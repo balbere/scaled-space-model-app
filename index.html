@@ -1268,6 +1268,30 @@ function hitSegment(x, y) {
   return best;
 }
 const segPop = document.getElementById("segPop");
+// Orbits view: the asteroid belt drawn as a scattered ring of small rocks between 2.2 and 3.2 AU from the Sun.
+// Each rock keeps a fixed place and an on-screen size, so the ring looks the same at any zoom; Ceres is drawn on top.
+const BELT_ROCKS = (() => {
+  const R = rngFor("asteroid-belt"), out = [];
+  for (let i = 0; i < 2400; i++) {
+    const g = (R() + R() + R() - 1.5) / 1.5;               // bunched toward the middle of the belt
+    out.push({ a: R() * Math.PI * 2, au: 2.7 + g * 0.5, size: 0.6 + Math.pow(R(), 3) * 1.9,
+               asp: 0.55 + R() * 0.45, rot: R() * Math.PI, shade: 120 + R() * 70 | 0 });
+  }
+  return out;
+})();
+function drawBelt(perAU, on) {
+  // draw more rocks the bigger the ring is on screen, so it looks equally dense at any zoom
+  const n = Math.min(BELT_ROCKS.length, Math.max(120, Math.round(2 * Math.PI * 2.7 * perAU * 0.9)));
+  for (let i = 0; i < n; i++) {
+    const k = BELT_ROCKS[i];
+    const d = k.au * perAU, x = cx + Math.cos(k.a) * d, y = cy - Math.sin(k.a) * d;
+    if (x < -4 || x > stageW + 4 || y < -4 || y > stageH + 4) continue;
+    const c = k.shade;
+    // warm brownish gray, so the rocks read as rocks and not as the white and bluish background stars
+    ctx.fillStyle = on ? "rgba(255," + (150 + c / 4 | 0) + ",70,0.95)" : "rgba(" + c + "," + (c - 22 | 0) + "," + (c - 48 | 0) + ",0.92)";
+    ctx.beginPath(); ctx.ellipse(x, y, k.size, k.size * k.asp, k.rot, 0, Math.PI * 2); ctx.fill();
+  }
+}
 function drawAllOverlay() {
   const P = placements();
   if (obj.map) {               // faint circular orbits around the Sun
@@ -1277,6 +1301,7 @@ function drawAllOverlay() {
       const r = p.o.au * perAU;
       if (!r) return;
       const on = i === selOrbit;               // the tapped orbit is drawn in amber
+      if (p.o.group) { drawBelt(perAU, on); return; }   // the asteroid belt is a ring of little rocks, not a line
       ctx.strokeStyle = on ? "rgba(255,184,77,0.9)" : "rgba(150,160,185,0.28)"; ctx.lineWidth = on ? 2 : 1;
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     });
