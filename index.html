@@ -1127,7 +1127,9 @@ function refreshAbout(o) {
       "(same side of the Sun) to farthest (opposite sides), treating orbits as circles. The Moon uses its real closest and farthest distance from Earth.")) +
     sec("Travel times", "Times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
       "Real trips are slower, since spacecraft follow curved paths.") +
-    (o.group || o.all ? sec("Asteroid belt", "The belt is shown by its largest member, Ceres, at the belt's average distance. Its surface map is approximate.") : "") +
+    (o.group || o.all ? sec("Asteroid belt", "The belt is shown by its largest member, Ceres, at the belt's average distance. Its surface map is approximate." +
+      (o.map ? " Its orbit is a plain line when zoomed out; zoom in (Inner planets does) and it becomes a scattered ring of little " +
+        "rocks, like the real belt: a band of countless asteroids, thickest around its average distance from the Sun." : "")) : "") +
     sec("Surface maps", 'From <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, CC BY 4.0. ' +
       "Earth's colors were adjusted, and Pluto's never-photographed southern region is filled in.");
   for (const k in cache) delete cache[k];
