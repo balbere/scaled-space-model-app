@@ -498,11 +498,29 @@ function longitudeOn(id, date) {
   const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
   return nu + el[3] * RAD;
 }
-const mapLong = {};
-let mapDay = new Date();
-function setMapDate(d) {
+const mapLong = {};            // longitude each object is drawn at (moves during the date-change animation)
+let mapDay = new Date(), mapAnim = null;
+// Changing the date glides each object along its orbit to its new spot: counterclockwise (the way planets really
+// move, seen from above) for a later date, clockwise for an earlier one, taking the short trip, not full laps.
+function setMapDate(d, animate) {
+  const forward = d.getTime() >= mapDay.getTime(), TAU = Math.PI * 2;
   mapDay = d;
-  ALL_LIST.forEach(o => { mapLong[o.id] = longitudeOn(o.id, d); });
+  const to = {}; ALL_LIST.forEach(o => { to[o.id] = longitudeOn(o.id, d); });
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { Object.assign(mapLong, to); mapAnim = null; return; }
+  const from = {}, delta = {};
+  ALL_LIST.forEach(o => {
+    const a = o.id in mapLong ? mapLong[o.id] : to[o.id];
+    let dd = ((to[o.id] - a) % TAU + TAU) % TAU;       // 0 to one lap, going forward
+    if (!forward && dd > 1e-9) dd -= TAU;               // going back in time: the other way around
+    from[o.id] = a; delta[o.id] = dd;
+  });
+  mapAnim = { t0: performance.now(), dur: 1400, from, delta };
+}
+function stepMapAnim(now) {
+  if (!mapAnim) return;
+  const k = Math.min(1, (now - mapAnim.t0) / mapAnim.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  for (const id in mapAnim.from) mapLong[id] = mapAnim.from[id] + mapAnim.delta[id] * e;
+  if (k >= 1) mapAnim = null;
 }
 setMapDate(new Date());
 const ALL_AU = 39.5;           // Sun to Pluto
@@ -974,7 +992,7 @@ const dateInput = document.getElementById("mapDate");
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 const dateLabel = document.getElementById("mapDateLabel");
 const showDate = d => { dateLabel.textContent = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
-function useDate(d) { setMapDate(d); showDate(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
+function useDate(d) { setMapDate(d, true); showDate(d); selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k]; }
 showDate(new Date());
 // on computers, clicking the text should open the calendar (not just select part of the hidden field)
 dateInput.addEventListener("click", () => { try { dateInput.showPicker(); } catch (e) {} });
@@ -1391,6 +1409,7 @@ function drawAllOverlay() {
 // ---------- Frame loop ----------
 const t0 = performance.now();
 function frame(now) {
+  stepMapAnim(now);
   if (anim) {
     const k = Math.min(1, (now - anim.t0) / anim.dur);       // linear: constant rate
     zoom = Math.exp(anim.z0 + (anim.z1 - anim.z0) * k);
