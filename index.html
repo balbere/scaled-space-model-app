@@ -1120,8 +1120,9 @@ function refreshAbout(o) {
       "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
     sec("Scale", "Pluto is <b>" + fmtScale() + "</b> from the Sun (its average distance, 39.5 times Earth's). Everything else is scaled from that: " +
       "<b>1 inch = " + Math.round(kmPerIn * 0.621371).toLocaleString() + " miles</b> of real space. Change it with the gear icon.") +
-    sec("True size", "At \u00d71, objects are drawn at their actual size in the model, using your screen's pixel density " +
-      "(iPhone 15 unless you use Calibrate Screen). Anything narrower than one pixel isn't drawn at all, so you have to zoom in to find it.") +
+    // Distances and Orbits draw every object at one enlarged size, so true size doesn't apply there
+    (o.all ? "" : sec("True size", "At \u00d71, objects are drawn at their actual size in the model, using your screen's pixel density " +
+      "(iPhone 15 unless you use Calibrate Screen). Anything narrower than one pixel isn't drawn at all, so you have to zoom in to find it.")) +
     // the range and Moon notes only apply to the single-object views' "Distance from" readout
     sec("Distances", "Each planet sits at its average distance from the Sun." + (o.all ? "" : " Distances between two objects show a range: closest " +
       "(same side of the Sun) to farthest (opposite sides), treating orbits as circles. The Moon uses its real closest and farthest distance from Earth.")) +
