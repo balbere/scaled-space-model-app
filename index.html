@@ -1000,14 +1000,28 @@ dateInput.addEventListener("click", () => { try { dateInput.showPicker(); } catc
 // field's default value, so the iPhone picker's Reset button goes back to today.
 const today = ymd(new Date());
 dateInput.value = today; dateInput.defaultValue = today;
+// On phones the date picker stays open over the viewer while the date is chosen, so the new date is held until the
+// picker closes (the field loses focus) and the glide starts just after, where it can be seen. On computers the
+// calendar closes as soon as a day is clicked, so the date is used right away.
+let pendingDate = null;
+const touchPicker = matchMedia("(pointer: coarse)").matches;
+function applyDate(d) {
+  if (touchPicker && document.activeElement === dateInput) { pendingDate = d; return; }
+  pendingDate = null; useDate(d);
+}
+dateInput.addEventListener("blur", () => {
+  if (!pendingDate) return;
+  const d = pendingDate; pendingDate = null;
+  setTimeout(() => useDate(d), 300);                 // let the picker finish sliding away first
+});
 dateInput.addEventListener("change", () => {
   const m = /^(\d{4,6})-(\d{2})-(\d{2})$/.exec(dateInput.value);
-  if (!m) { dateInput.value = dateInput.defaultValue; useDate(new Date()); return; }   // emptied: back to today
+  if (!m) { dateInput.value = dateInput.defaultValue; applyDate(new Date()); return; }   // emptied: back to today
   // build the date with setFullYear: new Date(y, ...) treats years 0-99 as 1900-1999, which turned a year typed
   // one digit at a time ("2" -> 1902) into the wrong year. The field itself is left alone while it's being typed in.
   const d = new Date(2000, +m[2] - 1, +m[3], 12);
   d.setFullYear(+m[1]);
-  useDate(d);
+  applyDate(d);
 });
 const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("mars")); };
 const showOuter = () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); };
