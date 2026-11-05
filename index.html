@@ -118,7 +118,9 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .kref { color: var(--sun); padding-right: 11px; border-bottom: 1px dotted var(--sun-dim); background: linear-gradient(45deg, transparent 50%, var(--sun) 50%) right 3px top 40% / 4px 4px no-repeat, linear-gradient(135deg, var(--sun) 50%, transparent 50%) right 0 top 40% / 4px 4px no-repeat; }
 /* full-screen Orbits: the date as an amber chip in the top-right corner of the viewer */
 .tdate { display: none !important; }
-.app.theater.mapview .tdate { display: inline-block !important; position: absolute; top: 12px; right: max(12px, env(safe-area-inset-right, 0px)); z-index: 4;
+/* sits just above the bottom controls, its right edge lined up with Show all's, centered on the 1-inch scale bar's
+   height (its top is set from script, where the scale bar's position is known) */
+.app.theater.mapview .tdate { display: inline-block !important; position: absolute; top: 0; right: max(12px, env(safe-area-inset-right, 0px)); z-index: 4;
   padding: 7px 11px; border-radius: 999px; background: rgba(20,25,39,.85); border: 1px solid var(--line);
   font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 .daterow { white-space: nowrap; text-align: right; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }   /* same look as the "Distance from" label */
@@ -839,6 +841,9 @@ function measureTheater() {
     theaterTop = Math.max(60, hb + 6);
     scaleY = bt - 12;                         // scale bar sits just above the controls
     theaterBottom = Math.max(60, stageH - bt + 34);
+    // Orbits date chip: vertically centered on the scale bar (its label and bar span scaleY-18 to scaleY)
+    const chip = document.getElementById("tDate");
+    chip.style.top = Math.round(scaleY - 9 - (chip.offsetHeight || 29) / 2) + "px";
   } else scaleY = stageH - 22;
 }
 function resize() {
