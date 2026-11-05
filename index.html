@@ -1122,8 +1122,9 @@ function refreshAbout(o) {
       "<b>1 inch = " + Math.round(kmPerIn * 0.621371).toLocaleString() + " miles</b> of real space. Change it with the gear icon.") +
     sec("True size", "At \u00d71, objects are drawn at their actual size in the model, using your screen's pixel density " +
       "(iPhone 15 unless you use Calibrate Screen). Anything narrower than one pixel isn't drawn at all, so you have to zoom in to find it.") +
-    sec("Distances", "Each planet sits at its average distance from the Sun. Distances between two objects show a range: closest " +
-      "(same side of the Sun) to farthest (opposite sides), treating orbits as circles. The Moon uses its real closest and farthest distance from Earth.") +
+    // the range and Moon notes only apply to the single-object views' "Distance from" readout
+    sec("Distances", "Each planet sits at its average distance from the Sun." + (o.all ? "" : " Distances between two objects show a range: closest " +
+      "(same side of the Sun) to farthest (opposite sides), treating orbits as circles. The Moon uses its real closest and farthest distance from Earth.")) +
     sec("Travel times", "Times use the top speed SpaceX's Starship has reached in flight, about 16,000 mph, as if held steady in a straight line. " +
       "Real trips are slower, since spacecraft follow curved paths.") +
     (o.group || o.all ? sec("Asteroid belt", "The belt is shown by its largest member, Ceres, at the belt's average distance. Its surface map is approximate.") : "") +
