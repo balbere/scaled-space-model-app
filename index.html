@@ -254,6 +254,7 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
   <div class="stage" id="stage">
     <canvas id="bg"></canvas>
+    <canvas id="bgOld" style="opacity:0"></canvas>
     <canvas id="gl"></canvas>
     <canvas id="ov"></canvas>
     <div class="hud gutter">
@@ -551,6 +552,15 @@ function placements() {
     const d = o.au * AU_KM * k;
     return { b: bodiesOf(o)[0], o, x: cx + allDir[0] * d, y: cy + allDir[1] * d, R: ICON_R };
   });
+  if (glide) {                 // gliding between objects: every object at its place on the line out from the Sun
+    const [ox, oy] = worldPos(obj), out = [];
+    for (const o of GLIDE_LIST) {
+      const [wx, wy] = worldPos(o);
+      for (const b of bodiesOf(o)) if (!b.companion)
+        out.push({ b, o, x: cx + (wx - ox + b.xKm) * k, y: cy + (wy - oy + b.yKm) * k, R: b.radKm * k });
+    }
+    return out;
+  }
   return bodiesOf(obj).map(b => ({ b, x: cx + b.xKm * k, y: cy + b.yKm * k, R: b.radKm * k }));
 }
 
@@ -740,6 +750,7 @@ function bodiesOf(o) {
 
 // ---------- Starry background (different for every object, never scales with zoom) ----------
 const bgc = document.getElementById("bg");
+const bgOld = document.getElementById("bgOld");   // the previous object's sky, fading out during a glide
 const BG = {
   sun:     { c: ["#ff9a3c", "#ff5e3a", "#ffd27a"], a: 0.05, stars: 0.8 },
   mercury: { c: ["#c8b89a", "#8c7c66", "#e8dcc4"], a: 0.025, stars: 0.7 },
@@ -853,7 +864,8 @@ function resize() {
   pendingAllRange = null;
   const oldW = stageW, oldH = stageH;
   stageW = r.width; stageH = r.height; dpr = Math.min(devicePixelRatio || 1, 3);
-  [bgc, glc, ov].forEach(c => { c.width = Math.round(stageW * dpr); c.height = Math.round(stageH * dpr); });
+  if (glide) { glide = null; bgOld.style.opacity = 0; }   // the screen changed shape: skip to the new object
+  [bgc, bgOld, glc, ov].forEach(c => { c.width = Math.round(stageW * dpr); c.height = Math.round(stageH * dpr); });
   drawBackground();
   hudPadL = parseFloat(getComputedStyle(document.querySelector(".hud")).paddingLeft) || 16;
   measureTheater();
@@ -912,7 +924,9 @@ function gestureState() {
   if (a.length === 1) return { mx: a[0][0], my: a[0][1], d: 0 };
   return null;
 }
-stage.addEventListener("pointerdown", e => { anim = null; stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, localXY(e)); last = gestureState(); });
+// touching the screen during a glide stops it where it is (the destination stays selected)
+const stopGlide = () => { if (glide) { glide = null; bgOld.style.opacity = 0; autoFit = false; } };
+stage.addEventListener("pointerdown", e => { anim = null; stopGlide();stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, localXY(e)); last = gestureState(); });
 stage.addEventListener("pointermove", e => {
   if (!pts.has(e.pointerId)) return;
   pts.set(e.pointerId, localXY(e));
@@ -937,7 +951,7 @@ stage.addEventListener("pointerup", e => {
   if (selSeg >= 0 || selBody >= 0 || selOrbit >= 0) allHintStep = 2;
 });
 stage.addEventListener("pointerup", endPt); stage.addEventListener("pointercancel", endPt);
-stage.addEventListener("wheel", e => { e.preventDefault(); anim = null; const [x, y] = localXY(e); zoomAbout(zoom * Math.exp(-e.deltaY * 0.0025), x, y); }, { passive: false });
+stage.addEventListener("wheel", e => { e.preventDefault(); anim = null; stopGlide(); const [x, y] = localXY(e); zoomAbout(zoom * Math.exp(-e.deltaY * 0.0025), x, y); }, { passive: false });
 ["gesturestart","gesturechange","gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault()));
 stage.addEventListener("touchmove", e => { if (!e.target.closest(".tbar")) e.preventDefault(); }, { passive: false });
 
@@ -946,6 +960,7 @@ let anim = null, lastZoomSecs = 0, zoomShownUntil = 0;
 let zoomSecs = 5;   // seconds for Earth to go from true size to filling the view
 try { const z = parseFloat(localStorage.getItem("zoomSecs")); if (z >= 0.5 && z <= 600) zoomSecs = z; } catch (e) {}
 function animateTo(targetZoom, tx, ty) {
+  stopGlide();
   autoFit = false;
   targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
   if (tx === undefined) { tx = view().x; ty = homeY(); }
@@ -1058,9 +1073,96 @@ function fitZoom() {
 document.getElementById("btnFill").addEventListener("click", fitZoom);
 document.getElementById("btnTrue").addEventListener("click", () => animateTo(1));
 
+// ---------- Glide between objects ----------
+// Switching from one object to another flies there through the to-scale model: zoom out until both fit, pan across,
+// zoom in. The objects sit on one straight line out from the Sun (to the right), each at its average distance, with
+// the Moon beside Earth. The path is van Wijk and Nuij's "smooth and efficient zooming and panning", which keeps the
+// apparent speed even the whole way.
+let glide = null;
+const GLIDE_LIST = OBJECTS.filter(o => !o.all);
+const EARTH_MOON = OBJECTS.find(o => o.id === "earth").companions[0];
+const worldPos = o => o.id === "moon" ? [AU_KM + EARTH_MOON.x, EARTH_MOON.y] : [(o.au || 0) * AU_KM, 0];   // km
+const GLIDE_RHO = Math.SQRT2;              // how much it zooms out on the way (van Wijk's suggested value)
+// the camera right now: the model point (km) at the middle of the viewing area, and CSS px per km
+function camNow() {
+  const k = pxPerKm(), [px, py] = worldPos(obj), v = view();
+  return { x: px + (v.x - cx) / k, y: py + (v.y - cy) / k, k };
+}
+function startGlide(from, to, c0) {
+  const v = view(), k1 = pxPerKm(), [x1, y1] = worldPos(to);   // the end: where selecting the object put it
+  const c1 = { x: x1 + (v.x - cx) / k1, y: y1 + (v.y - cy) / k1 };
+  const w0 = v.fit / c0.k, w1 = v.fit / k1, dx = c1.x - c0.x, dy = c1.y - c0.y, u1 = Math.hypot(dx, dy), p = GLIDE_RHO;
+  const g = { t0: performance.now(), from, to, x0: c0.x, y0: c0.y, x1: c1.x, y1: c1.y, k1, w0, u1, ux: 0, uy: 0 };
+  if (u1 < 1e-6 * Math.max(w0, w1)) {      // same spot: just zoom
+    g.S = Math.abs(Math.log(w1 / w0)) / p; g.sign = w1 > w0 ? 1 : -1;
+  } else {
+    g.ux = dx / u1; g.uy = dy / u1;
+    const b0 = (w1 * w1 - w0 * w0 + p ** 4 * u1 * u1) / (2 * w0 * p * p * u1);
+    const b1 = (w1 * w1 - w0 * w0 - p ** 4 * u1 * u1) / (2 * w1 * p * p * u1);
+    g.r0 = -Math.asinh(b0); g.S = (-Math.asinh(b1) - g.r0) / p;
+  }
+  if (!(g.S > 0)) return;
+  g.dur = Math.min(5500, Math.max(900, g.S * 400));   // e.g. Earth to Mars about 2.4 s, Earth to Pluto about 5 s
+  glide = g;
+}
+function stepGlide(now) {
+  const g = glide, t = Math.min(1, (now - g.t0) / g.dur);
+  const s = (0.5 - 0.5 * Math.cos(Math.PI * t)) * g.S;          // ease in and out
+  let u = 0, w;
+  if (g.r0 === undefined) w = g.w0 * Math.exp(g.sign * GLIDE_RHO * s);
+  else {
+    const p = GLIDE_RHO, r = p * s + g.r0;
+    u = g.w0 / (p * p) * (Math.cosh(g.r0) * Math.tanh(r) - Math.sinh(g.r0));
+    w = g.w0 * Math.cosh(g.r0) / Math.cosh(r);
+  }
+  const v = view(), [px, py] = worldPos(obj);
+  let k = v.fit / w, camX = g.x0 + g.ux * u, camY = g.y0 + g.uy * u;
+  if (t >= 1) { k = g.k1; camX = g.x1; camY = g.y1; glide = null; }
+  zoom = k / (IN_PER_KM * ppi);
+  cx = v.x + (px - camX) * k; cy = v.y + (py - camY) * k;
+  bgOld.style.opacity = glide ? 1 - Math.min(1, Math.max(0, (t - 0.2) / 0.6)) : 0;   // skies cross-fade mid-trip
+}
+// names on the objects while gliding: the destination in amber with the "is here" corners, where you came from in
+// white, any others passed on the way dimmer; a label is skipped when it would sit on top of one already drawn
+function drawGlideOverlay() {
+  const order = [glide.to, glide.from, ...GLIDE_LIST.filter(o => o !== glide.to && o !== glide.from)];
+  const k = pxPerKm(), [ox, oy] = worldPos(obj), placed = [];
+  for (const o of order) {
+    const [wx, wy] = worldPos(o), x = cx + (wx - ox) * k, y = cy + (wy - oy) * k;
+    if (x < -20 || x > stageW + 20 || y < -20 || y > stageH + 20) continue;
+    if (placed.some(([a, b]) => Math.hypot(a - x, b - y) < 34)) continue;
+    placed.push([x, y]);
+    const r = (o.group ? o.extentKm : o.km * (o.ring ? RING_OUT : 1)) / 2 * k;
+    const isTo = o === glide.to, isFrom = o === glide.from;
+    ctx.fillStyle = ctx.strokeStyle = isTo ? "rgba(255,184,77,0.95)" : isFrom ? "rgba(236,239,246,0.85)" : "rgba(200,206,222,0.5)";
+    ctx.lineWidth = 1.5; ctx.textAlign = "center";
+    if (r < 8) {
+      if (isTo) {
+        const h = 14, arm = 6;
+        ctx.beginPath();
+        for (const [sx, sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]) {
+          const ex = x + sx * h, ey = y + sy * h;
+          ctx.moveTo(ex, ey - sy * arm); ctx.lineTo(ex, ey); ctx.lineTo(ex - sx * arm, ey);
+        }
+        ctx.stroke();
+      } else { ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke(); }
+    }
+    const name = o.group ? "Ceres" : o.name;
+    ctx.fillText(name, x, y + Math.max(r, 14) + 15);
+  }
+}
+
 // ---------- Selection + static readouts ----------
 function selectObject(o) {
-  obj = o; selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
+  // a glide when going from one object to another (not to or from Distances or Orbits)
+  const from = obj, c0 = !reduceMotion && stageW > 0 && from !== o && !from.all && !o.all ? camNow() : null;
+  if (c0) {
+    const g = bgOld.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, bgOld.width, bgOld.height); g.drawImage(bgc, 0, 0);
+    bgOld.style.opacity = 1;
+  } else bgOld.style.opacity = 0;
+  glide = null;
+  obj = o;selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
   document.querySelectorAll(".chip, .tchip").forEach(c => c.setAttribute("aria-pressed", c.dataset.id === o.id));
   closeDrop();
   const tc = document.getElementById("tchip-" + o.id);
@@ -1072,6 +1174,7 @@ function selectObject(o) {
   autoFit = true; refit();
   drawBackground();
   refreshStatic();
+  if (c0) startGlide(from, o, c0);
 }
 function refreshStatic() {
   const o = obj;
@@ -1235,7 +1338,8 @@ function drawOverlay(t) {
   ctx.clearRect(0, 0, stageW, stageH);
   ctx.font = MONO;
   const ext = extentCss();
-  if (obj.all) drawAllOverlay();
+  if (glide) drawGlideOverlay();
+  else if (obj.all) drawAllOverlay();
   else if (ext < 16) {
     const pulse = reduceMotion ? 0 : (Math.sin(t / 380) + 1) * 2;
     const h = Math.max(14, ext / 2 + 8) + pulse, arm = 6;
@@ -1258,7 +1362,7 @@ function drawOverlay(t) {
     }
   }
   // companion (Moon next to Earth, or Earth next to the Moon)
-  if (!obj.all) for (const b of bodiesOf(obj)) {
+  if (!obj.all && !glide) for (const b of bodiesOf(obj)) {
     if (!b.companion) continue;
     const k = pxPerKm(), sx = cx + b.xKm * k, sy = cy + b.yKm * k, r = b.radKm * k;
     const sep = Math.hypot(sx - cx, sy - cy);
@@ -1453,6 +1557,7 @@ function drawAllOverlay() {
 const t0 = performance.now();
 function frame(now) {
   stepMapAnim(now);
+  if (glide) stepGlide(now);
   if (anim) {
     const k = Math.min(1, (now - anim.t0) / anim.dur);       // linear: constant rate
     zoom = Math.exp(anim.z0 + (anim.z1 - anim.z0) * k);
@@ -1512,7 +1617,7 @@ function frame(now) {
   setText(sScreen, "ss", fmtLen(dCss / ppi));
   if (theater()) setText(tInfo, "ti", "<b>" + obj.name + "</b> \u00b7 " + (obj.group ? "Ceres " : "") + fmtLen(mainKm() * IN_PER_KM) + " model \u00b7 on screen <em>" +
     (lit ? fmtLen(dCss / ppi) : "under 1 px") + "</em>");
-  const showHint = !hintDismissed && dPx < 60;
+  const showHint = !hintDismissed && dPx < 60 && !glide;
   hint.hidden = !showHint;
   if (showHint) setText(hint, "h", !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
   requestAnimationFrame(frame);
