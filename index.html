@@ -952,8 +952,11 @@ function animateTo(targetZoom, tx, ty) {
   if (reduceMotion) { zoom = targetZoom; cx = tx; cy = ty; return; }
   // Constant zoom speed: going from Earth at true size to Earth filling the view takes zoomSecs seconds (default 5),
   // so the time any zoom takes shows how big the size difference is.
-  const earthFit = view().fit / (12742 * IN_PER_KM * ppi);
-  const rate = Math.abs(Math.log(earthFit)) / (zoomSecs * 1000); // log-zoom units per ms
+  // Distances and Orbits always zoom at the speed the defaults give (5 s, a 500 ft model, an iPhone 15 screen);
+  // the Zoom speed setting, model size and calibration only change the speed in the single-object views
+  const earthPx = obj.all ? 12742 * (500 * 12 / (PLUTO_AU * AU_KM)) * IPHONE15_CSS_PPI : 12742 * IN_PER_KM * ppi;
+  const earthFit = view().fit / earthPx;
+  const rate = Math.abs(Math.log(earthFit)) / ((obj.all ? 5 : zoomSecs) * 1000); // log-zoom units per ms
   const zoomMs = Math.abs(Math.log(targetZoom / zoom)) / rate;
   const dur = Math.max(zoomMs, 400);                             // short glide if only re-centering
   anim = { t0: performance.now(), dur, zoomMs, z0: Math.log(zoom), z1: Math.log(targetZoom), x0: cx, y0: cy, x1: tx, y1: ty };
