@@ -543,6 +543,8 @@ function allRect() {           // where the line runs when the whole model is sh
 }
 // screen position and size of each body drawn this frame
 function placements() {
+  // during a morph to, from or between Distances and Orbits, the morph has placed and sized everything
+  if (morph) return morph.P.filter(p => 2 * p.R * dpr >= 1);   // a body under one pixel isn't drawn
   const k = pxPerKm();
   if (obj.map) return ALL_LIST.map(o => {        // seen from above: longitude 0 to the right, orbits counterclockwise
     const d = o.au * AU_KM * k, a = mapLong[o.id] || 0;
@@ -552,7 +554,6 @@ function placements() {
     const d = o.au * AU_KM * k;
     return { b: bodiesOf(o)[0], o, x: cx + allDir[0] * d, y: cy + allDir[1] * d, R: ICON_R };
   });
-  if (morph) return morph.P.filter(p => 2 * p.R * dpr >= 1);   // a body under one pixel isn't drawn
   if (glide) {                 // gliding between objects: every object at its place on the line out from the Sun
     const [ox, oy] = worldPos(obj), out = [];
     for (const o of GLIDE_LIST) {
