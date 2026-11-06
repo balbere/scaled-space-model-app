@@ -552,6 +552,7 @@ function placements() {
     const d = o.au * AU_KM * k;
     return { b: bodiesOf(o)[0], o, x: cx + allDir[0] * d, y: cy + allDir[1] * d, R: ICON_R };
   });
+  if (morph) return morph.P.filter(p => 2 * p.R * dpr >= 1);   // a body under one pixel isn't drawn
   if (glide) {                 // gliding between objects: every object at its place on the line out from the Sun
     const [ox, oy] = worldPos(obj), out = [];
     for (const o of GLIDE_LIST) {
@@ -772,9 +773,9 @@ function rngFor(str) {
   return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
-function drawBackground() {
-  const W = bgc.width, H = bgc.height; if (!W || !H) return;
-  const g = bgc.getContext("2d"), th = BG[obj.id] || BG.earth, R = rngFor(obj.id + "-sky");
+function drawBackground(c = bgc, o = obj) {
+  const W = c.width, H = c.height; if (!W || !H) return;
+  const g = c.getContext("2d"), th = BG[o.id] || BG.earth, R = rngFor(o.id + "-sky");
   const gauss = () => (R() + R() + R() - 1.5) / 1.5;
   g.globalCompositeOperation = "source-over"; g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
   const L = Math.hypot(W, H), ang = R() * Math.PI, bx = W * (0.25 + 0.5 * R()), by = H * (0.25 + 0.5 * R());
@@ -864,13 +865,19 @@ function resize() {
   pendingAllRange = null;
   const oldW = stageW, oldH = stageH;
   stageW = r.width; stageH = r.height; dpr = Math.min(devicePixelRatio || 1, 3);
-  if (glide) { glide = null; bgOld.style.opacity = 0; }   // the screen changed shape: skip to the new object
+  // a morph to or from Distances or Orbits changes the panel below, so the screen changes shape just as it starts:
+  // start it again for the new shape. Any other change of shape during a glide or morph skips to the end.
+  const redo = morph && performance.now() - morph.t0 < 400 ? morph : null;
+  if (glide || morph) { glide = morph = null; bgOld.style.opacity = 0; }
   [bgc, bgOld, glc, ov].forEach(c => { c.width = Math.round(stageW * dpr); c.height = Math.round(stageH * dpr); });
   drawBackground();
   hudPadL = parseFloat(getComputedStyle(document.querySelector(".hud")).paddingLeft) || 16;
   measureTheater();
   if (firstLayout) { cx = view().x; cy = homeY(); }
-  else if (autoFit && !anim) refit();
+  else if (autoFit && !anim) {
+    refit();
+    if (redo) { drawBackground(bgOld, redo.from); bgOld.style.opacity = 1; startMorph(redo.from, redo.to, redo.s0); }
+  }
   else if (allRange) { anim = null; setAllRange(allRange[0], allRange[1]); }
   else { cx += (stageW - oldW) / 2; cy += (stageH - oldH) / 2; }
   clampCenter();
@@ -925,7 +932,10 @@ function gestureState() {
   return null;
 }
 // touching the screen during a glide stops it where it is (the destination stays selected)
-const stopGlide = () => { if (glide) { glide = null; bgOld.style.opacity = 0; autoFit = false; } };
+const stopGlide = () => {
+  if (glide) { glide = null; bgOld.style.opacity = 0; autoFit = false; }
+  if (morph) { const m = morph; morph = null; zoom = m.z1; cx = m.cx1; cy = m.cy1; bgOld.style.opacity = 0; }   // jump to the end
+};
 stage.addEventListener("pointerdown", e => { anim = null; stopGlide();stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, localXY(e)); last = gestureState(); });
 stage.addEventListener("pointermove", e => {
   if (!pts.has(e.pointerId)) return;
@@ -1108,7 +1118,7 @@ function startGlide(from, to, c0) {
   glide = g;
 }
 function stepGlide(now) {
-  const g = glide, t = Math.min(1, (now - g.t0) / g.dur);
+  const g = glide, t = Math.min(1, Math.max(0, (now - g.t0) / g.dur));
   const s = (0.5 - 0.5 * Math.cos(Math.PI * t)) * g.S;          // ease in and out
   let u = 0, w;
   if (g.r0 === undefined) w = g.w0 * Math.exp(g.sign * GLIDE_RHO * s);
@@ -1154,17 +1164,144 @@ function drawGlideOverlay() {
   }
 }
 
+// ---------- Morphs to, from and between Distances and Orbits ----------
+// "swing": Distances <-> Orbits. The Sun slides to its new spot, each object swings around the Sun to its new
+//   direction at the same distance, the dashed line turns between the diagonal and straight up, and the orbit
+//   circles fade in or out.
+// "zoom": one object <-> Distances or Orbits. The camera zooms out (or in) along the same smooth path as the glide,
+//   through the overview's layout at true scale; the object shrinks from its true size into its icon (or grows back),
+//   and the other icons, names, lines and orbits fade in (or out).
+let morph = null;
+const MORPH_LIST = [...ALL_LIST, OBJECTS.find(o => o.id === "moon")];   // the Moon only appears in single views
+const ease = t => 0.5 - 0.5 * Math.cos(Math.PI * t);
+// van Wijk and Nuij's zoom-and-pan path between two cameras (centre x, y and visible width w, in km)
+function wijkPath(x0, y0, w0, x1, y1, w1) {
+  const p = GLIDE_RHO, dx = x1 - x0, dy = y1 - y0, u1 = Math.hypot(dx, dy);
+  if (u1 < 1e-6 * Math.max(w0, w1)) {
+    const sign = w1 > w0 ? 1 : -1;
+    return { S: Math.abs(Math.log(w1 / w0)) / p, at: s => ({ x: x0, y: y0, w: w0 * Math.exp(sign * p * s) }) };
+  }
+  const b0 = (w1 * w1 - w0 * w0 + p ** 4 * u1 * u1) / (2 * w0 * p * p * u1);
+  const b1 = (w1 * w1 - w0 * w0 - p ** 4 * u1 * u1) / (2 * w1 * p * p * u1);
+  const r0 = -Math.asinh(b0), S = (-Math.asinh(b1) - r0) / p;
+  return { S, at: s => {
+    const r = p * s + r0, u = w0 / (p * p) * (Math.cosh(r0) * Math.tanh(r) - Math.sinh(r0));
+    return { x: x0 + dx / u1 * u, y: y0 + dy / u1 * u, w: w0 * Math.cosh(r0) / Math.cosh(r) };
+  } };
+}
+// where an object sits in an overview's layout, in km from the Sun (screen directions: x right, y down)
+function overviewPos(o, map) {
+  if (o.id === "moon") { const [x, y] = overviewPos(OBJECTS.find(q => q.id === "earth"), map); return [x + EARTH_MOON.x, y + EARTH_MOON.y]; }
+  const d = o.au * AU_KM;
+  if (map) { const a = mapLong[o.id] || 0; return [Math.cos(a) * d, -Math.sin(a) * d]; }
+  return [allDir[0] * d, allDir[1] * d];
+}
+// called at the end of selectObject, once the new view's own starting framing (cx, cy, zoom) is set
+function startMorph(from, to, s0) {
+  const k1 = pxPerKm(), m = { t0: performance.now(), from, to, s0, z1: zoom, cx1: cx, cy1: cy };
+  if (from.all && to.all) {
+    m.kind = "swing"; m.dur = 1600;
+    m.k0 = s0.k; m.k1 = k1; m.sx0 = s0.cx; m.sy0 = s0.cy; m.sx1 = cx; m.sy1 = cy;
+    const diag = Math.atan2(allDir[1], allDir[0]), mapAng = o => -(mapLong[o.id] || 0);
+    const angFrom = to.map ? () => diag : mapAng, angTo = to.map ? mapAng : () => diag;
+    m.a0 = {}; m.da = {};
+    for (const o of ALL_LIST) {
+      const a = angFrom(o); let d = angTo(o) - a;
+      d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI;      // the shorter way round
+      m.a0[o.id] = a; m.da[o.id] = d;
+    }
+    m.L0 = to.map ? diag : -Math.PI / 2; m.L1 = to.map ? -Math.PI / 2 : diag;
+  } else {
+    m.kind = "zoom"; m.ov = to.all ? to : from; m.sub = to.all ? from : to; m.toOv = !!to.all;
+    const map = !!m.ov.map, W2 = stageW / 2, H2 = stageH / 2;
+    // the camera: the model point at the middle of the screen. The overview is anchored by the Sun at (cx, cy),
+    // a single view by its object at (cx, cy)
+    const camOf = (o, scx, scy, k) => {
+      const [px, py] = o.all ? [0, 0] : overviewPos(o, map);
+      return { x: px + (W2 - scx) / k, y: py + (H2 - scy) / k, w: stageW / k };
+    };
+    const c0 = camOf(from, s0.cx, s0.cy, s0.k), c1 = camOf(to, cx, cy, k1);
+    m.path = wijkPath(c0.x, c0.y, c0.w, c1.x, c1.y, c1.w);
+    if (!(m.path.S > 0)) return;
+    m.dur = Math.min(4000, Math.max(900, m.path.S * 4000 / 12.3));   // same speed as the glide
+    m.map = map;
+  }
+  morph = m;
+  stepMorph(m.t0);
+}
+function stepMorph(now) {
+  const m = morph, t = Math.min(1, Math.max(0, (now - m.t0) / m.dur)), e = ease(t);
+  const P = [];
+  let sx, sy, k;
+  if (m.kind === "swing") {
+    k = Math.exp(Math.log(m.k0) + (Math.log(m.k1) - Math.log(m.k0)) * e);
+    sx = m.sx0 + (m.sx1 - m.sx0) * e; sy = m.sy0 + (m.sy1 - m.sy0) * e;
+    for (const o of ALL_LIST) {
+      const a = m.a0[o.id] + m.da[o.id] * e, d = o.au * AU_KM * k;
+      P.push({ b: bodiesOf(o)[0], o, x: sx + Math.cos(a) * d, y: sy + Math.sin(a) * d, R: ICON_R });
+    }
+    m.aOrb = m.to.map ? e : 1 - e; m.aLine = 1; m.aName = 1;
+    m.lineAng = m.L0 + (m.L1 - m.L0) * e;
+  } else {
+    const c = m.path.at(e * m.path.S), W2 = stageW / 2, H2 = stageH / 2;
+    k = stageW / c.w;
+    const a = m.toOv ? e : 1 - e;                        // how far along toward the overview's look
+    sx = W2 - c.x * k; sy = H2 - c.y * k;
+    for (const o of MORPH_LIST) {
+      const [px, py] = overviewPos(o, m.map), b = bodiesOf(o)[0];
+      const R = b.radKm * k * (1 - a) + (o.id === "moon" ? 0 : ICON_R) * a;
+      P.push({ b, o, x: sx + px * k, y: sy + py * k, R });
+    }
+    m.aOrb = m.map ? a : 0; m.aLine = a; m.aName = a;
+    m.lineAng = m.map ? -Math.PI / 2 : Math.atan2(allDir[1], allDir[0]);
+  }
+  m.P = P; m.sx = sx; m.sy = sy; m.k = k;
+  zoom = k / (IN_PER_KM * ppi);
+  if (obj.all) { cx = sx; cy = sy; }
+  else { const s = P.find(p => p.o === m.sub) || { x: m.cx1, y: m.cy1 }; cx = s.x; cy = s.y; }
+  bgOld.style.opacity = 1 - Math.min(1, Math.max(0, (t - 0.2) / 0.6));
+  if (t >= 1) { morph = null; zoom = m.z1; cx = m.cx1; cy = m.cy1; bgOld.style.opacity = 0; }
+}
+// orbits, the dashed line and names, faded by how far the morph has gone
+function drawMorphOverlay() {
+  const m = morph, perAU = AU_KM * m.k;
+  if (m.aOrb > 0.01) {
+    ctx.strokeStyle = "rgba(150,160,185," + (0.28 * m.aOrb) + ")"; ctx.lineWidth = 1;
+    for (const o of ALL_LIST) if (o.au) { ctx.beginPath(); ctx.arc(m.sx, m.sy, o.au * perAU, 0, Math.PI * 2); ctx.stroke(); }
+  }
+  if (m.aLine > 0.01) {
+    const L = ALL_AU * perAU;
+    ctx.strokeStyle = "rgba(255,184,77," + (0.45 * m.aLine) + ")"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]);
+    ctx.beginPath(); ctx.moveTo(m.sx, m.sy); ctx.lineTo(m.sx + Math.cos(m.lineAng) * L, m.sy + Math.sin(m.lineAng) * L); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.textAlign = "center";
+  const drawn = [], sub = m.kind === "zoom" ? m.sub : null;
+  const order = sub ? [...m.P.filter(p => p.o === sub), ...m.P.filter(p => p.o !== sub)] : m.P;
+  for (const p of order) {
+    const isSub = p.o === sub, al = isSub ? 0.95 : 0.85 * m.aName;
+    if (al < 0.03 || p.o.id === "moon" && !isSub) continue;
+    if (p.x < -40 || p.x > stageW + 40 || p.y < -20 || p.y > stageH) continue;
+    if (drawn.some(q => Math.hypot(p.x - q[0], p.y - q[1]) < 40)) continue;
+    ctx.fillStyle = isSub ? "rgba(255,184,77," + al + ")" : "rgba(236,239,246," + al + ")";
+    ctx.fillText(p.o.short || p.o.name, p.x, p.y + Math.max(p.R, ICON_R) + 13);
+    drawn.push([p.x, p.y]);
+  }
+}
+
 // ---------- Selection + static readouts ----------
 function selectObject(o) {
-  // a glide when going from one object to another (not to or from Distances or Orbits)
-  const from = obj, c0 = !reduceMotion && stageW > 0 && from !== o && !from.all && !o.all ? camNow() : null;
-  if (c0) {
-    const g = bgOld.getContext("2d");
-    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, bgOld.width, bgOld.height); g.drawImage(bgc, 0, 0);
+  // animate the change: a glide between two objects, a swing between Distances and Orbits, or a zoom between an
+  // object and either of those
+  const from = obj, moving = !reduceMotion && stageW > 0 && from !== o;
+  const c0 = moving && !from.all && !o.all ? camNow() : null;
+  const s0 = moving && (from.all || o.all) ? { cx, cy, k: pxPerKm() } : null;
+  if (c0 || s0) {
+    drawBackground(bgOld, from);   // the old sky, faded out during the trip
     bgOld.style.opacity = 1;
   } else bgOld.style.opacity = 0;
-  glide = null;
-  obj = o;selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
+  glide = null; morph = null;
+  obj = o; selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
   document.querySelectorAll(".chip, .tchip").forEach(c => c.setAttribute("aria-pressed", c.dataset.id === o.id));
   closeDrop();
   const tc = document.getElementById("tchip-" + o.id);
@@ -1177,6 +1314,7 @@ function selectObject(o) {
   drawBackground();
   refreshStatic();
   if (c0) startGlide(from, o, c0);
+  if (s0) startMorph(from, o, s0);
 }
 function refreshStatic() {
   const o = obj;
@@ -1341,6 +1479,7 @@ function drawOverlay(t) {
   ctx.font = MONO;
   const ext = extentCss();
   if (glide) drawGlideOverlay();
+  else if (morph) drawMorphOverlay();
   else if (obj.all) drawAllOverlay();
   else if (ext < 16) {
     const pulse = reduceMotion ? 0 : (Math.sin(t / 380) + 1) * 2;
@@ -1364,7 +1503,7 @@ function drawOverlay(t) {
     }
   }
   // companion (Moon next to Earth, or Earth next to the Moon)
-  if (!obj.all && !glide) for (const b of bodiesOf(obj)) {
+  if (!obj.all && !glide && !morph) for (const b of bodiesOf(obj)) {
     if (!b.companion) continue;
     const k = pxPerKm(), sx = cx + b.xKm * k, sy = cy + b.yKm * k, r = b.radKm * k;
     const sep = Math.hypot(sx - cx, sy - cy);
@@ -1560,6 +1699,7 @@ const t0 = performance.now();
 function frame(now) {
   stepMapAnim(now);
   if (glide) stepGlide(now);
+  if (morph) stepMorph(now);
   if (anim) {
     const k = Math.min(1, (now - anim.t0) / anim.dur);       // linear: constant rate
     zoom = Math.exp(anim.z0 + (anim.z1 - anim.z0) * k);
@@ -1619,7 +1759,7 @@ function frame(now) {
   setText(sScreen, "ss", fmtLen(dCss / ppi));
   if (theater()) setText(tInfo, "ti", "<b>" + obj.name + "</b> \u00b7 " + (obj.group ? "Ceres " : "") + fmtLen(mainKm() * IN_PER_KM) + " model \u00b7 on screen <em>" +
     (lit ? fmtLen(dCss / ppi) : "under 1 px") + "</em>");
-  const showHint = !hintDismissed && dPx < 60 && !glide;
+  const showHint = !hintDismissed && dPx < 60 && !glide && !morph;
   hint.hidden = !showHint;
   if (showHint) setText(hint, "h", !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
   requestAnimationFrame(frame);
