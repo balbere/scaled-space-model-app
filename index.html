@@ -872,7 +872,8 @@ function resize() {
   const redo = morph;
   if (glide) { glide = null; bgOld.style.opacity = 0; }
   morph = null;
-  [glc, ov].forEach(c => { c.width = Math.round(stageW * dpr); c.height = Math.round(stageH * dpr); });
+  // (setting a canvas's size clears it, even to the same size, so only when it changed)
+  [glc, ov].forEach(c => { const w = Math.round(stageW * dpr), h = Math.round(stageH * dpr); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } });
   // the starry sky is drawn at least as tall as the window and only redrawn when that size changes, so the viewer
   // growing or shrinking with the panel below doesn't redraw it on every frame (the extra height is just cut off)
   const bw = Math.round(stageW * dpr), bh = Math.round(Math.max(stageH, innerHeight) * dpr);
@@ -892,6 +893,7 @@ function resize() {
   else { cx += (stageW - oldW) / 2; cy += (stageH - oldH) / 2; }
   if (redo && !morph) bgOld.style.opacity = 0;
   clampCenter();
+  if (!firstLayout) render(performance.now());   // redraw now so the cleared canvases never reach the screen
 }
 new ResizeObserver(resize).observe(stage);
 
@@ -1754,7 +1756,9 @@ function drawAllOverlay() {
 
 // ---------- Frame loop ----------
 const t0 = performance.now();
-function frame(now) {
+// draws one frame; also called straight after the viewer is resized, since resizing a canvas clears it and the
+// screen would otherwise show it blank until the next frame (a brief flash with nothing on it)
+function render(now) {
   stepMapAnim(now);
   if (glide) stepGlide(now);
   if (morph) stepMorph(now);
@@ -1802,7 +1806,7 @@ function frame(now) {
   drawOverlay(now);
 
   // live readouts
-  if (obj.all) { allReadouts(); requestAnimationFrame(frame); return; }
+  if (obj.all) { allReadouts(); return; }
   setText(zoomVal, "z", fmtZoom(zoom));
   setText(zoomLab, "zl", (anim || now < zoomShownUntil) && lastZoomSecs > 0.05
     ? (anim ? "zooming \u00b7 " : "zoom took ") + lastZoomSecs.toFixed(1) + " s"
@@ -1820,8 +1824,8 @@ function frame(now) {
   const showHint = !hintDismissed && dPx < 60 && !glide && !morph;
   hint.hidden = !showHint;
   if (showHint) setText(hint, "h", !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
-  requestAnimationFrame(frame);
 }
+function frame(now) { render(now); requestAnimationFrame(frame); }
 
 function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
