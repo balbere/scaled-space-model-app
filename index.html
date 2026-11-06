@@ -919,7 +919,7 @@ function resize() {
   else { cx += (stageW - oldW) / 2; cy += (stageH - oldH) / 2; }
   if (redo && !morph) bgOld.style.opacity = 0;
   clampCenter();
-  if (!firstLayout) render(performance.now());   // redraw now so the cleared canvases never reach the screen
+  if (!firstLayout) render(performance.now(), false);   // redraw now so the cleared canvases never reach the screen
 }
 new ResizeObserver(resize).observe(stage);
 
@@ -1143,7 +1143,7 @@ function startGlide(from, to, c0) {
   const v = view(), k1 = pxPerKm(), [x1, y1] = worldPos(to);   // the end: where selecting the object put it
   const c1 = { x: x1 + (v.x - cx) / k1, y: y1 + (v.y - cy) / k1 };
   const w0 = v.fit / c0.k, w1 = v.fit / k1, dx = c1.x - c0.x, dy = c1.y - c0.y, u1 = Math.hypot(dx, dy), p = GLIDE_RHO;
-  const g = { t0: performance.now(), from, to, x0: c0.x, y0: c0.y, x1: c1.x, y1: c1.y, k1, w0, u1, ux: 0, uy: 0,
+  const g = { t0: null, from, to, x0: c0.x, y0: c0.y, x1: c1.x, y1: c1.y, k1, w0, u1, ux: 0, uy: 0,
     z1: zoom, cx1: cx, cy1: cy };   // the end framing, used if the trip is cut short
   if (u1 < 1e-6 * Math.max(w0, w1)) {      // same spot: just zoom
     g.S = Math.abs(Math.log(w1 / w0)) / p; g.sign = w1 > w0 ? 1 : -1;
@@ -1159,8 +1159,12 @@ function startGlide(from, to, c0) {
   g.dur = Math.min(4000, Math.max(700, g.S * 4000 / 12.3));
   glide = g;
 }
-function stepGlide(now) {
-  const g = glide, t = Math.min(1, Math.max(0, (now - g.t0) / g.dur));
+// An animation's clock starts on the first frame actually drawn for the screen ("live"), not at the tap: the work
+// done at the tap can hold up that first frame on a phone, and a clock already running would skip ahead.
+function stepGlide(now, live) {
+  const g = glide;
+  if (g.t0 === null && live) g.t0 = now;
+  const t = g.t0 === null ? 0 : Math.min(1, Math.max(0, (now - g.t0) / g.dur));
   const s = (0.5 - 0.5 * Math.cos(Math.PI * t)) * g.S;          // ease in and out
   let u = 0, w;
   if (g.r0 === undefined) w = g.w0 * Math.exp(g.sign * GLIDE_RHO * s);
@@ -1240,7 +1244,7 @@ function overviewPos(o, map) {
 }
 // called at the end of selectObject, once the new view's own starting framing (cx, cy, zoom) is set
 function startMorph(from, to, s0, t0) {
-  const k1 = pxPerKm(), m = { t0: t0 === undefined ? performance.now() : t0, from, to, s0, z1: zoom, cx1: cx, cy1: cy };
+  const k1 = pxPerKm(), m = { t0: t0 === undefined ? null : t0, from, to, s0, z1: zoom, cx1: cx, cy1: cy };
   if (from.all && to.all) {
     m.kind = "swing"; m.dur = 1600;
     m.k0 = s0.k; m.k1 = k1; m.sx0 = s0.cx; m.sy0 = s0.cy; m.sx1 = cx; m.sy1 = cy;
@@ -1273,10 +1277,12 @@ function startMorph(from, to, s0, t0) {
     if (m.sub.id !== "moon") { m.R0 = bodiesOf(m.sub)[0].radKm * (m.toOv ? s0.k : k1); m.R1 = ICON_R; if (!m.toOv) [m.R0, m.R1] = [m.R1, m.R0]; }
   }
   morph = m;
-  stepMorph(performance.now());
+  stepMorph(performance.now(), false);
 }
-function stepMorph(now) {
-  const m = morph, t = Math.min(1, Math.max(0, (now - m.t0) / m.dur)), e = ease(t);
+function stepMorph(now, live) {
+  const m = morph;
+  if (m.t0 === null && live) m.t0 = now;
+  const t = m.t0 === null ? 0 : Math.min(1, Math.max(0, (now - m.t0) / m.dur)), e = ease(t);
   const P = [];
   let sx, sy, k;
   if (m.kind === "swing") {
@@ -1352,22 +1358,30 @@ function crossFade(el) {
   if (el === panel) { Object.assign(g.style, { position: "absolute", left: 0, right: 0, top: "-1px", height: "", overflow: "" }); panel.appendChild(g); }
   else el.after(g);
   el.style.transition = "none"; el.style.opacity = 0;
-  void el.offsetWidth;
-  el.style.transition = "opacity " + FADE_MS + "ms ease"; el.style.opacity = 1;
-  g.style.transition = "opacity " + FADE_MS + "ms ease"; requestAnimationFrame(() => { g.style.opacity = 0; });
-  el._fadeTimer = setTimeout(() => { g.remove(); el.style.transition = ""; }, FADE_MS + 60);
+  // the fades start on the next frame, after the work done at the tap, so they're seen from their beginning
+  const run = el._fadeRun = (el._fadeRun || 0) + 1;
+  requestAnimationFrame(() => {
+    if (run !== el._fadeRun) return;   // a newer cross-fade of this element took over
+    el.style.transition = "opacity " + FADE_MS + "ms ease"; el.style.opacity = 1;
+    g.style.transition = "opacity " + FADE_MS + "ms ease"; g.style.opacity = 0;
+    el._fadeTimer = setTimeout(() => { g.remove(); el.style.transition = ""; }, FADE_MS + 60);
+  });
 }
 // the panel's height slides from its old height to its new one (the viewer above shrinks or grows to match)
-let panelTimer = 0;
+let panelTimer = 0, panelRun = 0;
 function growPanel(h0) {
-  clearTimeout(panelTimer);
+  clearTimeout(panelTimer); panelRun++;
   panel.style.transition = "none"; panel.style.height = "";
   const h1 = panel.offsetHeight;
   if (Math.abs(h1 - h0) < 1) { panel.style.overflow = ""; return; }
   panel.style.height = h0 + "px"; panel.style.overflow = "hidden";
-  void panel.offsetHeight;
-  panel.style.transition = "height " + FADE_MS + "ms ease, opacity " + FADE_MS + "ms ease"; panel.style.height = h1 + "px";
-  panelTimer = setTimeout(() => { panel.style.height = ""; panel.style.overflow = ""; panel.style.transition = ""; }, FADE_MS + 60);
+  // the slide starts on the next frame too (it stays at the old height until then)
+  const token = ++panelRun;
+  requestAnimationFrame(() => {
+    if (token !== panelRun) return;
+    panel.style.transition = "height " + FADE_MS + "ms ease, opacity " + FADE_MS + "ms ease"; panel.style.height = h1 + "px";
+    panelTimer = setTimeout(() => { panel.style.height = ""; panel.style.overflow = ""; panel.style.transition = ""; }, FADE_MS + 60);
+  });
 }
 
 // ---------- Selection + static readouts ----------
@@ -1786,10 +1800,10 @@ function drawAllOverlay() {
 const t0 = performance.now();
 // draws one frame; also called straight after the viewer is resized, since resizing a canvas clears it and the
 // screen would otherwise show it blank until the next frame (a brief flash with nothing on it)
-function render(now) {
+function render(now, live) {
   stepMapAnim(now);
-  if (glide) stepGlide(now);
-  if (morph) stepMorph(now);
+  if (glide) stepGlide(now, live);
+  if (morph) stepMorph(now, live);
   if (anim) {
     const k = Math.min(1, (now - anim.t0) / anim.dur);       // linear: constant rate
     zoom = Math.exp(anim.z0 + (anim.z1 - anim.z0) * k);
@@ -1852,13 +1866,15 @@ function render(now) {
   const showHint = !hintDismissed && dPx < 60 && !glide && !morph;
   setHint(showHint, !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
 }
-function frame(now) { render(now); requestAnimationFrame(frame); }
+function frame(now) { render(now, true); requestAnimationFrame(frame); }
 
 // the hint pill at the bottom of the viewer fades in and out. It's hidden during glides and morphs, keeping its old
 // words while it fades out; the new view's words are put in only when it's shown again.
 function setHint(show, text) {
   if (show) setText(hint, "h", text);
-  hint.classList.toggle("off", !show);
+  if (hint._show === show) return;
+  hint._show = show;               // the fade itself starts on the next frame, so it isn't cut short by a slow one
+  requestAnimationFrame(() => hint.classList.toggle("off", !hint._show));
 }
 function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
