@@ -148,6 +148,10 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
    (those strips are zero in a normal browser tab), so they sit flush with the bottom of the screen */
 .sheet { position: absolute; inset: calc(-1 * env(safe-area-inset-top, 0px)) 0 calc(-1 * env(safe-area-inset-bottom, 0px)); padding-top: env(safe-area-inset-top, 0px); background: rgba(0,0,0,.72); display: grid; place-items: end center; z-index: 5; }
 .sheet .card { width: 100%; max-width: 520px; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding-block: 18px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+.sheet { transition: background-color .3s ease; }
+.sheet .card { transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
+.sheet.closed { background-color: rgba(0,0,0,0); }
+.sheet.closed .card { transform: translateY(100%); }
 .sheet h2 { font-family: var(--font-display); font-weight: 500; font-size: 17px; margin: 0; }
 .sheet p { margin: 0; color: var(--muted); line-height: 1.45; max-width: 60ch; }
 .cardbox { height: 0; border: 2px solid var(--sun); border-top: 0; border-radius: 0 0 10px 10px; box-sizing: border-box; max-width: 100%; }
@@ -1951,10 +1955,10 @@ function updatePreview() {
   scalePreview.innerHTML = "Sun <b>" + fmtLen(sun) + "</b> wide, Earth <b>" + fmtLen(earth) + "</b> wide.";
 }
 document.getElementById("scaleBtn").addEventListener("click", () => {
-  scaleInput.value = +sig(scaleFt / UNIT_FT[scaleUnit], 6); scaleUnitSel.value = scaleUnit; speedInput.value = zoomSecs; updatePreview(); scaleSheet.hidden = false;
+  scaleInput.value = +sig(scaleFt / UNIT_FT[scaleUnit], 6); scaleUnitSel.value = scaleUnit; speedInput.value = zoomSecs; updatePreview(); openSheet(scaleSheet);
 });
 scaleInput.addEventListener("input", updatePreview); scaleUnitSel.addEventListener("change", updatePreview);
-document.getElementById("scaleCancel").addEventListener("click", () => { scaleSheet.hidden = true; });
+document.getElementById("scaleCancel").addEventListener("click", () => { closeSheet(scaleSheet); });
 document.getElementById("scaleForm").addEventListener("submit", e => {
   e.preventDefault();
   const ft = pendingFt(); if (!(ft > 0)) return;
@@ -1966,9 +1970,23 @@ document.getElementById("scaleForm").addEventListener("submit", e => {
   scaleFt = ft; scaleUnit = scaleUnitSel.value; applyScale();
   try { localStorage.setItem("scale", JSON.stringify({ ft: scaleFt, unit: scaleUnit })); } catch (err) {}
   document.getElementById("scaleBtn").setAttribute("aria-label", "Model settings: " + scaleWord() + " scale");
-  scaleInput.blur(); scaleSheet.hidden = true;
+  scaleInput.blur(); closeSheet(scaleSheet);
   selectObject(obj);
 });
+
+// ---------- Sheets slide up from the bottom when opened and back down when closed ----------
+function openSheet(el) {
+  clearTimeout(el._closeTimer);
+  el.classList.add("closed"); el.hidden = false;
+  void el.offsetWidth;                 // lay it out in the closed position first, so it slides from there
+  el.classList.remove("closed");
+}
+function closeSheet(el) {
+  if (el.hidden) return;
+  el.classList.add("closed");
+  clearTimeout(el._closeTimer);
+  el._closeTimer = setTimeout(() => { el.hidden = true; el.classList.remove("closed"); }, reduceMotion ? 0 : 340);
+}
 
 // ---------- Calibration sheet ----------
 const calib = document.getElementById("calib"), slider = document.getElementById("ppiSlider"), cardBox = document.getElementById("cardBox");
@@ -1986,21 +2004,34 @@ function setSliderRange() {
   slider.value = Math.min(hi, Math.max(lo, ppi));
 }
 let calibOpened = null;   // the setting when the sheet was opened, restored by Cancel
-deviceBtn.addEventListener("click", () => { calibOpened = { ppi, calibrated }; calib.hidden = false; setSliderRange(); drawCard(); });
+deviceBtn.addEventListener("click", () => { calibOpened = { ppi, calibrated }; openSheet(calib); setSliderRange(); drawCard(); });
 addEventListener("resize", () => { if (!calib.hidden) setSliderRange(); });
 slider.addEventListener("input", () => { ppi = parseFloat(slider.value); calibrated = true; drawCard(); });
 document.getElementById("calibReset").addEventListener("click", () => { ppi = IPHONE15_CSS_PPI; calibrated = false; slider.value = ppi; drawCard(); });
 document.getElementById("calibCancel").addEventListener("click", () => {
   if (calibOpened) { ppi = calibOpened.ppi; calibrated = calibOpened.calibrated; }
-  calib.hidden = true;
+  closeSheet(calib);
 });
 const aboutSheet = document.getElementById("aboutSheet");
-document.getElementById("aboutBtn").addEventListener("click", () => { aboutSheet.hidden = false; });
-document.getElementById("aboutClose").addEventListener("click", () => { aboutSheet.hidden = true; });
-aboutSheet.addEventListener("click", e => { if (e.target === aboutSheet) aboutSheet.hidden = true; });
-document.addEventListener("keydown", e => { if (e.key === "Escape") aboutSheet.hidden = true; });
+document.getElementById("aboutBtn").addEventListener("click", () => { openSheet(aboutSheet); });
+document.getElementById("aboutClose").addEventListener("click", () => { closeSheet(aboutSheet); });
+// a tap or click outside a sheet (on the dimmed area) closes it the way its Cancel or Close button does, so the
+// model settings and calibration are left as they were. Only when the press also started outside: a drag of the
+// calibration slider that ends off the sheet doesn't count. The Escape key does the same.
+const cancelSheet = sh => (sh === calib ? document.getElementById("calibCancel")
+  : sh === scaleSheet ? document.getElementById("scaleCancel") : document.getElementById("aboutClose")).click();
+document.querySelectorAll(".sheet").forEach(sh => {
+  let downOutside = false;
+  sh.addEventListener("pointerdown", e => { downOutside = e.target === sh; });
+  sh.addEventListener("click", e => { if (e.target === sh && downOutside) cancelSheet(sh); downOutside = false; });
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const open = [...document.querySelectorAll(".sheet")].find(sh => !sh.hidden && !sh.classList.contains("closed"));
+  if (open) cancelSheet(open);
+});
 document.getElementById("calibDone").addEventListener("click", () => {
-  calib.hidden = true; updateDeviceLabel();
+  closeSheet(calib); updateDeviceLabel();
   try { if (calibrated) localStorage.setItem("ppi", String(ppi)); else localStorage.removeItem("ppi"); } catch (e) {}
   refreshStatic();
 });
