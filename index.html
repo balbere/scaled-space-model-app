@@ -1243,9 +1243,10 @@ function startMorph(from, to, s0, t0) {
     if (!(m.path.S > 0)) return;
     m.dur = Math.min(4000, Math.max(900, m.path.S * 4000 / 12.3));   // same speed as the glide
     m.map = map;
-    // going to the overview, the object's size on screen changes steadily from what it was to its icon size
-    // (otherwise zooming out shrinks it to a dot almost at once and the icon size takes over)
-    if (m.toOv && m.sub.id !== "moon") m.R0 = bodiesOf(m.sub)[0].radKm * s0.k;
+    // the object's size on screen changes steadily between its size in the single view and its icon size, both
+    // ways (blending its true size with the icon size instead makes it snap to the icon going out, and dip below the
+    // icon size before growing coming back). The Moon has no icon, so it keeps the blend and fades to or from nothing.
+    if (m.sub.id !== "moon") { m.R0 = bodiesOf(m.sub)[0].radKm * (m.toOv ? s0.k : k1); m.R1 = ICON_R; if (!m.toOv) [m.R0, m.R1] = [m.R1, m.R0]; }
   }
   morph = m;
   stepMorph(performance.now());
@@ -1270,7 +1271,7 @@ function stepMorph(now) {
     sx = W2 - c.x * k; sy = H2 - c.y * k;
     for (const o of MORPH_LIST) {
       const [px, py] = overviewPos(o, m.map), b = bodiesOf(o)[0];
-      const R = o === m.sub && m.R0 ? Math.exp(Math.log(m.R0) + (Math.log(ICON_R) - Math.log(m.R0)) * e)
+      const R = o === m.sub && m.R0 ? Math.exp(Math.log(m.R0) + (Math.log(m.R1) - Math.log(m.R0)) * e)
         : b.radKm * k * (1 - a) + (o.id === "moon" ? 0 : ICON_R) * a;
       P.push({ b, o, x: sx + px * k, y: sy + py * k, R });
     }
