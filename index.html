@@ -1320,8 +1320,21 @@ function stepMorph(now, live) {
 function drawMorphOverlay() {
   const m = morph, perAU = AU_KM * m.k;
   if (m.aOrb > 0.01) {
-    ctx.strokeStyle = "rgba(150,160,185," + (0.28 * m.aOrb) + ")"; ctx.lineWidth = 1;
-    for (const o of ALL_LIST) if (o.au) { ctx.beginPath(); ctx.arc(m.sx, m.sy, o.au * perAU, 0, Math.PI * 2); ctx.stroke(); }
+    // the asteroid belt is drawn as in the Orbits view: a ring of rocks when zoomed in to within about 3x its
+    // distance, a plain orbit line farther out (blending in between), all fading with the orbits
+    const r = allRect(), visAU = Math.min(r.r - r.l, r.b - r.t) / 2 / perAU;
+    ctx.lineWidth = 1;
+    for (const o of ALL_LIST) if (o.au) {
+      let line = 1;
+      if (o.group) {
+        const rocks = Math.min(1, Math.max(0, (3.5 * o.au - visAU) / (0.5 * o.au)));
+        if (rocks > 0) { ctx.globalAlpha = rocks * m.aOrb; drawBelt(perAU, false, m.sx, m.sy); ctx.globalAlpha = 1; }
+        line = 1 - rocks;
+      }
+      if (line <= 0) continue;
+      ctx.strokeStyle = "rgba(150,160,185," + (0.28 * m.aOrb * line) + ")";
+      ctx.beginPath(); ctx.arc(m.sx, m.sy, o.au * perAU, 0, Math.PI * 2); ctx.stroke();
+    }
   }
   if (m.aLine > 0.01) {
     const L = ALL_AU * perAU;
@@ -1699,12 +1712,12 @@ const BELT_ROCKS = (() => {
   }
   return out;
 })();
-function drawBelt(perAU, on) {
+function drawBelt(perAU, on, ox = cx, oy = cy) {   // ox, oy: the Sun on screen
   // draw more rocks the bigger the ring is on screen, so it looks equally dense at any zoom
   const n = Math.min(BELT_ROCKS.length, Math.max(120, Math.round(2 * Math.PI * 2.7 * perAU * 0.9)));
   for (let i = 0; i < n; i++) {
     const k = BELT_ROCKS[i];
-    const d = k.au * perAU, x = cx + Math.cos(k.a) * d, y = cy - Math.sin(k.a) * d;
+    const d = k.au * perAU, x = ox + Math.cos(k.a) * d, y = oy - Math.sin(k.a) * d;
     if (x < -4 || x > stageW + 4 || y < -4 || y > stageH + 4) continue;
     const c = k.shade;
     // warm brownish gray, so the rocks read as rocks and not as the white and bluish background stars
