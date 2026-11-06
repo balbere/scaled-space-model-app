@@ -197,6 +197,8 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .trow button { flex: 0 0 auto; min-width: 48px; border-radius: 10px; padding: 8px 4px; font-weight: 600; }
 .trow button.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
 .app.theater .hint { bottom: 98px; }
+.hint { transition: opacity .35s ease; }
+.hint.off { opacity: 0; }
 /* "All" view */
 .zoomval.nts { font-size: 21px; letter-spacing: 0.04em; }
 .app.theater .zoomval.nts { font-size: 19px; }
@@ -1822,11 +1824,16 @@ function render(now) {
   if (theater()) setText(tInfo, "ti", "<b>" + obj.name + "</b> \u00b7 " + (obj.group ? "Ceres " : "") + fmtLen(mainKm() * IN_PER_KM) + " model \u00b7 on screen <em>" +
     (lit ? fmtLen(dCss / ppi) : "under 1 px") + "</em>");
   const showHint = !hintDismissed && dPx < 60 && !glide && !morph;
-  hint.hidden = !showHint;
-  if (showHint) setText(hint, "h", !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
+  setHint(showHint, !lit ? "Smaller than one pixel, so the screen stays black. Pinch out." : "Pinch out to see it");
 }
 function frame(now) { render(now); requestAnimationFrame(frame); }
 
+// the hint pill at the bottom of the viewer fades in and out. It's hidden during glides and morphs, keeping its old
+// words while it fades out; the new view's words are put in only when it's shown again.
+function setHint(show, text) {
+  if (show) setText(hint, "h", text);
+  hint.classList.toggle("off", !show);
+}
 function allReadouts() {
   setText(zoomVal, "z", "PLANETS NOT TO SCALE");
   setText(zoomLab, "zl", "");
@@ -1835,8 +1842,7 @@ function allReadouts() {
     ? "<b>Orbits</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size"
     : "<b>Distances</b> \u00b7 tap a line for distance and travel time \u00b7 tap a planet for size");
   if (allHintStep === 0 && hintDismissed) allHintStep = 1;      // after the first pinch, suggest tapping a line
-  hint.hidden = allHintStep >= 2;
-  if (!hint.hidden) setText(hint, "h", allHintStep === 0 ? "Pinch to spread out the inner planets" : "Tap a line for distance and travel time");
+  setHint(allHintStep < 2 && !morph, allHintStep === 0 ? "Pinch to spread out the inner planets" : "Tap a line for distance and travel time");
 }
 
 // ---------- Full-screen viewing mode ----------
