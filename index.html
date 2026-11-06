@@ -931,9 +931,11 @@ function gestureState() {
   if (a.length === 1) return { mx: a[0][0], my: a[0][1], d: 0 };
   return null;
 }
-// touching the screen during a glide stops it where it is (the destination stays selected)
+// touching the screen during a glide or morph skips to its end: the new object centered at its starting zoom (true
+// size, or zoomed out to fit if it's too big), or the overview's starting framing. A pinch or drag then carries on
+// from there.
 const stopGlide = () => {
-  if (glide) { glide = null; bgOld.style.opacity = 0; autoFit = false; }
+  if (glide) { const g = glide; glide = null; zoom = g.z1; cx = g.cx1; cy = g.cy1; bgOld.style.opacity = 0; }
   if (morph) { const m = morph; morph = null; zoom = m.z1; cx = m.cx1; cy = m.cy1; bgOld.style.opacity = 0; }   // jump to the end
 };
 stage.addEventListener("pointerdown", e => { anim = null; stopGlide();stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, localXY(e)); last = gestureState(); });
@@ -1102,7 +1104,8 @@ function startGlide(from, to, c0) {
   const v = view(), k1 = pxPerKm(), [x1, y1] = worldPos(to);   // the end: where selecting the object put it
   const c1 = { x: x1 + (v.x - cx) / k1, y: y1 + (v.y - cy) / k1 };
   const w0 = v.fit / c0.k, w1 = v.fit / k1, dx = c1.x - c0.x, dy = c1.y - c0.y, u1 = Math.hypot(dx, dy), p = GLIDE_RHO;
-  const g = { t0: performance.now(), from, to, x0: c0.x, y0: c0.y, x1: c1.x, y1: c1.y, k1, w0, u1, ux: 0, uy: 0 };
+  const g = { t0: performance.now(), from, to, x0: c0.x, y0: c0.y, x1: c1.x, y1: c1.y, k1, w0, u1, ux: 0, uy: 0,
+    z1: zoom, cx1: cx, cy1: cy };   // the end framing, used if the trip is cut short
   if (u1 < 1e-6 * Math.max(w0, w1)) {      // same spot: just zoom
     g.S = Math.abs(Math.log(w1 / w0)) / p; g.sign = w1 > w0 ? 1 : -1;
   } else {
