@@ -1102,7 +1102,9 @@ function startGlide(from, to, c0) {
     g.r0 = -Math.asinh(b0); g.S = (-Math.asinh(b1) - g.r0) / p;
   }
   if (!(g.S > 0)) return;
-  g.dur = Math.min(5500, Math.max(900, g.S * 400));   // e.g. Earth to Mars about 2.4 s, Earth to Pluto about 5 s
+  // speed: the longest trip, the Sun to Pluto (a path length of about 12.3), takes 3 s; others take their share of
+  // that (Earth to Mars about 1.5 s), with at least 0.55 s for short hops and never more than 3 s
+  g.dur = Math.min(3000, Math.max(550, g.S * 3000 / 12.3));
   glide = g;
 }
 function stepGlide(now) {
