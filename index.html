@@ -777,9 +777,28 @@ function rngFor(str) {
   return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+// Painting a sky is slow on phones (big soft gradients over millions of pixels), and it used to happen twice at the
+// moment of every switch, stalling the first frame of each animation. So the soft glow is painted at low resolution
+// and stretched (it has no fine detail to lose), and finished skies are kept for the last few objects shown.
+const skyCache = new Map();   // "id|width|height" -> finished sky; most recently used last
 function drawBackground(c = bgc, o = obj) {
   const W = c.width, H = c.height; if (!W || !H) return;
-  const g = c.getContext("2d"), th = BG[o.id] || BG.earth, R = rngFor(o.id + "-sky");
+  const key = o.id + "|" + W + "|" + H;
+  let sky = skyCache.get(key);
+  if (sky) skyCache.delete(key);
+  else { sky = document.createElement("canvas"); sky.width = W; sky.height = H; paintSky(sky, o); }
+  skyCache.set(key, sky);
+  while (skyCache.size > 3) skyCache.delete(skyCache.keys().next().value);
+  const g = c.getContext("2d");
+  g.globalCompositeOperation = "source-over"; g.drawImage(sky, 0, 0);
+}
+function paintSky(c, o) {
+  const W = c.width, H = c.height;
+  const g0 = c.getContext("2d"), th = BG[o.id] || BG.earth, R = rngFor(o.id + "-sky");
+  // the glow and dust lanes go on a small canvas (about half a CSS pixel per pixel), stretched onto the sky after
+  const q = Math.min(1, 0.5 / dpr), neb = document.createElement("canvas");
+  neb.width = Math.ceil(W * q); neb.height = Math.ceil(H * q);
+  const g = neb.getContext("2d"); g.setTransform(q, 0, 0, q, 0, 0);
   const gauss = () => (R() + R() + R() - 1.5) / 1.5;
   g.globalCompositeOperation = "source-over"; g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
   const L = Math.hypot(W, H), ang = R() * Math.PI, bx = W * (0.25 + 0.5 * R()), by = H * (0.25 + 0.5 * R());
@@ -800,6 +819,11 @@ function drawBackground(c = bgc, o = obj) {
     gr.addColorStop(0, "rgba(0,0,0,0.35)"); gr.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
+  g0.imageSmoothingQuality = "high"; g0.drawImage(neb, 0, 0, W, H);
+  // galaxies and stars stay sharp, painted at full resolution
+  return paintStars(g0, W, H, th, R, along);
+}
+function paintStars(g, W, H, th, R, along) {
   // a few far-off galaxies
   g.globalCompositeOperation = "lighter";
   const ng = 1 + ((R() * 3) | 0);
@@ -1354,7 +1378,8 @@ function selectObject(o) {
   const c0 = moving && !from.all && !o.all ? camNow() : null;
   const s0 = moving && (from.all || o.all) ? { cx, cy, k: pxPerKm() } : null;
   if (c0 || s0) {
-    drawBackground(bgOld, from);   // the old sky, faded out during the trip
+    const g = bgOld.getContext("2d");   // the old sky (still on screen), faded out during the trip
+    g.globalCompositeOperation = "source-over"; g.drawImage(bgc, 0, 0);
     bgOld.style.opacity = 1;
   } else bgOld.style.opacity = 0;
   // to, from or between Distances and Orbits the words in the viewer's top left change: cross-fade them
