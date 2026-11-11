@@ -1487,8 +1487,8 @@ function refreshStatic() {
   document.getElementById("sModel").innerHTML = fmtLen(din);
   renderDist();
   document.getElementById("sReal").innerHTML = o.group
-    ? Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi"
-    : Math.round(o.km * 0.621371).toLocaleString() + " mi";
+    ? Math.round(o.members[0].km * 0.621371).toLocaleString() + " mi."
+    : Math.round(o.km * 0.621371).toLocaleString() + " mi.";
   refreshAbout(o);
 }
 function refreshAbout(o) {
@@ -1558,7 +1558,7 @@ function renderDist() {
   distModeLabel.textContent = distMode === "time" ? "Time" : "Distance";
   distModeSel.value = distMode;
 }
-// "6.63 ft" + "31.9 ft" -> "6.63–31.9 ft"; mixed units keep both: "5.4 months – 3.1 years"
+// "6.63 ft." + "31.9 ft." -> "6.63–31.9 ft."; mixed units keep both: "5.4 months – 3.1 years"
 function joinRange(a, b) {
   const ua = a.replace(/^[\d.,]+ /, ""), ub = b.replace(/^[\d.,]+ /, "");
   return ua === ub ? a.slice(0, a.length - ua.length - 1) + "\u2013" + b : a + " \u2013 " + b;
@@ -1585,15 +1585,16 @@ function fmtTrip(au, bare) {
 // ---------- Formatting ----------
 function sig(x, n) { if (x === 0) return "0"; const d = Math.max(0, n - 1 - Math.floor(Math.log10(Math.abs(x)))); return x.toFixed(Math.min(d, 8)); }
 function fmtFt(ft) {
-  if (ft < 1) return sig(ft * 12, 2) + " in";
-  if (ft < 5280) return (ft < 100 ? sig(ft, 3) : Math.round(ft).toLocaleString()) + " ft";
-  return sig(ft / 5280, 3) + " mi";
+  // unit abbreviations end with a period: in., ft., mi.
+  if (ft < 1) return sig(ft * 12, 2) + " in.";
+  if (ft < 5280) return (ft < 100 ? sig(ft, 3) : Math.round(ft).toLocaleString()) + " ft.";
+  return sig(ft / 5280, 3) + " mi.";
 }
-function fmtLen(inches) { return inches < 12 ? sig(inches, 3) + " in" : fmtFt(inches / 12); }
+function fmtLen(inches) { return inches < 12 ? sig(inches, 3) + " in." : fmtFt(inches / 12); }
 function fmtZoom(z) { return X + (z < 0.1 ? z.toFixed(3) : z < 10 ? z.toFixed(2) : z < 100 ? z.toFixed(1) : Math.round(z).toLocaleString()); }
 function fmtScale() {
   const v = scaleFt / UNIT_FT[scaleUnit];
-  const names = { ft: "ft", yd: v === 1 ? "yard" : "yards", mi: v === 1 ? "mile" : "miles" };
+  const names = { ft: "ft.", yd: v === 1 ? "yard" : "yards", mi: v === 1 ? "mile" : "miles" };
   return (+sig(v, 4)).toLocaleString() + " " + names[scaleUnit];
 }
 function scaleWord() {
@@ -1673,7 +1674,7 @@ function drawOverlay(t) {
   ctx.beginPath(); ctx.moveTo(x0, y0 - 5); ctx.lineTo(x0, y0); ctx.lineTo(x0 + len, y0); ctx.lineTo(x0 + len, y0 - 5); ctx.stroke();
   ctx.fillStyle = "rgba(236,239,246,0.9)"; ctx.textAlign = "left";
   const mi = miles >= 100 ? Math.round(miles).toLocaleString() : sig(miles, 3);
-  ctx.fillText("1 in = " + mi + (miles === 1 ? " mile" : " miles"), x0, y0 - 9);
+  ctx.fillText("1 in. = " + mi + (miles === 1 ? " mile" : " miles"), x0, y0 - 9);
 }
 
 // All view: connector lines between neighbors, name labels, and the tapped line's popup
@@ -1893,7 +1894,7 @@ function render(now, live) {
   const screenIn = stageW / ppi;
   // the model's scale is named in this line, so it's always visible which size of model is on screen
   const v = +sig(scaleFt / UNIT_FT[scaleUnit], 4);
-  const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft", yd: "yd", mi: "mile" }[scaleUnit] + "</b> model";   // "500 ft model", "2 mile model"
+  const model = "the <b>" + v.toLocaleString() + " " + { ft: "ft.", yd: "yd.", mi: "mile" }[scaleUnit] + "</b> model";   // "500 ft. model", "2 mile model"
   setText(equiv, "eq", "Your screen shows <b>" + fmtLen(screenIn / zoom) + "</b> of " + model + " across.");
   const dCss = mainDiamCss(), dPx = dCss * dpr;
   const lit = dPx >= 1;
