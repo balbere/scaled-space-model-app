@@ -46,6 +46,13 @@
 html, body { height: 100%; }
 /* The strips behind the clock and the home indicator take the header/panel color (black in full-screen view) */
 html { background: var(--panel); }
+/* Home Screen app on iPhone: iOS can report a page height that leaves out the status bar (WebKit bug 301108), so
+   the app stops about 60pt short of the bottom of the screen. Make the page that much taller, but never taller than
+   the screen (100lvh). Being CSS, it updates by itself the moment iOS reports the status bar's height, which at
+   launch can come a moment after the page starts, with no resize event to say so. */
+@media (display-mode: standalone) {
+  html { height: max(100%, min(100lvh, calc(100% + env(safe-area-inset-top, 0px)))); }
+}
 html:has(.app.theater) { background: var(--void); }
 [hidden] { display: none !important; }
 body {
@@ -230,8 +237,11 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 <script>
 // Home Screen app on iPhone: the page runs edge to edge (behind the clock and home indicator), but iOS
 // reports a page height that leaves out the status bar, so "100% tall" falls about 60pt short and leaves
-// an empty band at the bottom. When the page really is edge to edge (it has a top safe-area inset),
-// size it to the physical screen instead. In a normal browser tab nothing changes.
+// an empty band at the bottom. A CSS rule (display-mode: standalone) handles this; as a backup, when the page
+// really is edge to edge (it has a top safe-area inset) and still short, size it to the physical screen.
+// iOS can report the status bar's height a moment after launch without any resize event, so this checks again
+// on load, whenever the visible area changes, and a few times over the first two seconds. In a normal browser
+// tab nothing changes.
 (() => {
   if (!window.navigator.standalone) return;
   const root = document.documentElement;
@@ -250,6 +260,15 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
   fit("start");
   addEventListener("resize", () => fit("resize"));
   addEventListener("orientationchange", () => setTimeout(() => fit("rotate"), 300));
+  addEventListener("load", () => fit("load"));
+  addEventListener("pageshow", () => fit("show"));
+  if (window.visualViewport) visualViewport.addEventListener("resize", () => fit("visible"));
+  // re-check a few times while iOS finishes setting up, but only log and act when something changed
+  let last = "";
+  for (const ms of [150, 300, 600, 1000, 2000]) setTimeout(() => {
+    const now = (parseFloat(getComputedStyle(root).paddingTop) || 0) + "|" + innerHeight;
+    if (now !== last) { last = now; fit("check " + ms); }
+  }, ms);
 })();
 </script>
 <div class="app">
