@@ -113,6 +113,19 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
 .panel { position: relative; box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); padding-block: 12px 12px; display: grid; gap: 10px; align-content: start; }
 .ghost { pointer-events: none; }
+/* Orbits: the time controls, a pill along the bottom of the viewer (above the buttons in full screen). It fades in
+   and out with the Orbits view. */
+.timebar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 2px;
+  padding: 3px; border-radius: 999px; background: rgba(12,15,23,.88); border: 1px solid var(--line);
+  opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s linear .35s; }
+.app.mapview .timebar { opacity: 1; visibility: visible; transition: opacity .35s ease; }
+.app.theater .timebar { bottom: 62px; }
+.timebar .tt { width: 36px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 999px; background: none; color: var(--ink); cursor: pointer; padding: 0; }
+.timebar .tt svg { width: 20px; height: 20px; }
+.timebar .tt[aria-pressed="true"] { background: #241b0c; color: var(--sun); }
+.timebar .tt:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.timebar .ttsep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+.timebar .ttspeed { font: 500 12.5px var(--font-mono); color: var(--sun); white-space: nowrap; min-width: 112px; text-align: center; }
 .namerow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .pname { font-family: var(--font-display); font-weight: 500; font-size: 18px; line-height: 1.2; margin: 0; text-wrap: balance; white-space: nowrap; }
 .like { flex: 1 1 auto; color: var(--muted); font-size: 13px; line-height: 1.35; text-align: right; min-width: 0; text-wrap: balance; }
@@ -207,7 +220,7 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .trow { flex: 0 0 auto; }
 .trow button { flex: 0 0 auto; min-width: 48px; border-radius: 10px; padding: 8px 4px; font-weight: 600; }
 .trow button.primary { background: var(--sun); color: #1b1305; border-color: var(--sun); }
-.app.theater .hint { bottom: 98px; }
+
 .hint { transition: opacity .35s ease; }
 .hint.off { opacity: 0; }
 /* "All" view */
@@ -303,6 +316,15 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
       </div>
       <div class="tspace"></div>
       <div class="trow"><button id="tTrue" type="button">&times;1</button><button id="tInner" type="button" hidden>Inner</button><button id="tOuter" type="button" hidden>Outer</button><button id="tFill" class="primary" type="button">Fill</button></div>
+    </div>
+    <div class="timebar" id="timebar" role="group" aria-label="Move through time">
+      <button class="tt" id="ttBack" type="button" aria-label="Play backward in time" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5.5v13L6.5 12z" fill="currentColor"/></svg></button>
+      <button class="tt" id="ttPause" type="button" aria-label="Pause" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 6h3v12h-3zM13.5 6h3v12h-3z" fill="currentColor"/></svg></button>
+      <button class="tt" id="ttFwd" type="button" aria-label="Play forward in time" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5v13L17.5 12z" fill="currentColor"/></svg></button>
+      <span class="ttsep" aria-hidden="true"></span>
+      <button class="tt" id="ttSlower" type="button" aria-label="Slower"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+      <span class="kpick ttspeed"><span class="kref" id="ttSpeedLabel">1 month / sec</span><select id="ttSpeed" aria-label="Speed: how much time passes each second"></select></span>
+      <button class="tt" id="ttFaster" type="button" aria-label="Faster"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="hint" id="hint">Pinch out to zoom in</div>
     <div class="segpop" id="segPop" hidden><b id="segName"></b><span id="segVal"></span><small id="segNote" hidden></small></div>
@@ -535,13 +557,19 @@ function longitudeOn(id, date) {
 }
 const mapLong = {};            // longitude each object is drawn at (moves during the date-change animation)
 let mapDay = new Date(), mapAnim = null;
+// the asteroid belt's rocks: days from today (when their spots were made) at the start and end of a date glide, and
+// how far through it is
+const BELT_T0 = Date.now();
+const belt = { from: 0, to: 0, e: 1, fwd: true };
+const beltDaysOf = d => (d.getTime() - BELT_T0) / 86400000;
 // Changing the date glides each object along its orbit to its new spot: counterclockwise (the way planets really
 // move, seen from above) for a later date, clockwise for an earlier one, taking the short trip, not full laps.
 function setMapDate(d, animate) {
   const forward = d.getTime() >= mapDay.getTime(), TAU = Math.PI * 2;
   mapDay = d;
   const to = {}; ALL_LIST.forEach(o => { to[o.id] = longitudeOn(o.id, d); });
-  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { Object.assign(mapLong, to); mapAnim = null; return; }
+  belt.from = belt.to; belt.to = beltDaysOf(d); belt.fwd = forward; belt.e = 0;
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { Object.assign(mapLong, to); mapAnim = null; belt.from = belt.to; belt.e = 1; return; }
   const from = {}, delta = {};
   ALL_LIST.forEach(o => {
     const a = o.id in mapLong ? mapLong[o.id] : to[o.id];
@@ -555,7 +583,8 @@ function stepMapAnim(now) {
   if (!mapAnim) return;
   const k = Math.min(1, (now - mapAnim.t0) / mapAnim.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
   for (const id in mapAnim.from) mapLong[id] = mapAnim.from[id] + mapAnim.delta[id] * e;
-  if (k >= 1) mapAnim = null;
+  belt.e = e;
+  if (k >= 1) { mapAnim = null; belt.from = belt.to; belt.e = 1; }
 }
 setMapDate(new Date());
 const ALL_AU = 39.5;           // Sun to Pluto
@@ -563,7 +592,7 @@ const ICON_R = 13;             // radius of every object in the All view, CSS px
 let allDir = [0.6, -0.8];      // unit direction of the line, bottom left to top right
 let hudBottom = 70;
 function allRect() {           // where the line runs when the whole model is shown
-  const top = theater() ? theaterTop : hudBottom + 6, bottom = theater() ? theaterBottom : 44;
+  const top = theater() ? theaterTop : hudBottom + 6, bottom = theater() ? theaterBottom : stageH - (scaleY || stageH - 22) + 22;
   const pad = ICON_R + 8;
   return { l: pad + 6, r: stageW - pad - 10, t: top + pad, b: stageH - bottom - pad - 12 };
 }
@@ -574,7 +603,7 @@ function placements() {
   const k = pxPerKm();
   if (obj.map) return ALL_LIST.map(o => {        // seen from above: longitude 0 to the right, orbits counterclockwise
     const d = o.au * AU_KM * k, a = mapLong[o.id] || 0;
-    return { b: bodiesOf(o)[0], o, x: cx + Math.cos(a) * d, y: cy - Math.sin(a) * d, R: ICON_R, lon: a };
+    return { b: bodiesOf(o)[0], o, x: cx + Math.cos(a) * d, y: cy - Math.sin(a) * d, R: ICON_R, lon: a, a: 1 - ttFade(o) };
   });
   if (obj.all) return ALL_LIST.map(o => {
     const d = o.au * AU_KM * k;
@@ -661,7 +690,7 @@ precision highp float;
 uniform vec2 uC; uniform float uR; uniform vec3 uAx;
 uniform sampler2D uTex; uniform sampler2D uRing; uniform float uHasRing;
 uniform mat3 uM; uniform float uRot; uniform float uOff; uniform vec3 uL; uniform vec3 uTint;
-uniform float uLimb; uniform float uAtmo; uniform vec3 uAtmoCol; uniform float uSun;
+uniform float uLimb; uniform float uAtmo; uniform vec3 uAtmoCol; uniform float uSun; uniform float uAlpha;
 uniform float uRin; uniform float uRout;
 out vec4 o;
 const float PI = 3.14159265;
@@ -716,7 +745,7 @@ void main(){
       else col = col + vec4(rcol * ra, ra) * (1. - col.a);
     }
   }
-  o = col;
+  o = col * uAlpha;               // premultiplied: fading scales every channel
 }`;
 function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
 const prog = gl.createProgram();
@@ -725,7 +754,7 @@ gl.linkProgram(prog); gl.useProgram(prog);
 const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 const aLoc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(aLoc); gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
-const U = {}; ["uC","uR","uAx","uTex","uRing","uHasRing","uM","uRot","uOff","uL","uTint","uLimb","uAtmo","uAtmoCol","uSun","uRin","uRout"].forEach(k => U[k] = gl.getUniformLocation(prog, k));
+const U = {}; ["uC","uR","uAx","uTex","uRing","uHasRing","uM","uRot","uOff","uL","uTint","uLimb","uAtmo","uAtmoCol","uSun","uRin","uRout","uAlpha"].forEach(k => U[k] = gl.getUniformLocation(prog, k));
 gl.uniform1i(U.uTex, 0); gl.uniform1i(U.uRing, 1);
 const L = (() => { const v = [-0.45, 0.25, 0.86]; const m = Math.hypot(...v); return v.map(x => x / m); })();
 gl.uniform3fv(U.uL, L); gl.uniform1f(U.uRin, RING_IN); gl.uniform1f(U.uRout, RING_OUT);
@@ -898,16 +927,20 @@ let theaterTop = 120, theaterBottom = 110, scaleY = 0;
 function measureTheater() {
   const sr = stage.getBoundingClientRect();
   hudBottom = document.querySelector(".hud").getBoundingClientRect().bottom - sr.top;
+  // in Orbits the time controls sit along the bottom of the viewer (above the buttons in full screen), so the scale
+  // bar, the hint and the view's framing all sit above them instead
+  const tb = obj.map ? document.getElementById("timebar").getBoundingClientRect().top - sr.top : null;
   if (theater()) {
     const hb = document.querySelector(".hud").getBoundingClientRect().bottom - sr.top;
-    const bt = document.querySelector(".tbar").getBoundingClientRect().top - sr.top;
+    const bt = tb !== null ? tb : document.querySelector(".tbar").getBoundingClientRect().top - sr.top;
     theaterTop = Math.max(60, hb + 6);
     scaleY = bt - 12;                         // scale bar sits just above the controls
     theaterBottom = Math.max(60, stageH - bt + 34);
     // Orbits date chip: vertically centered on the scale bar (its label and bar span scaleY-18 to scaleY)
     const chip = document.getElementById("tDate");
     chip.style.top = Math.round(scaleY - 9 - (chip.offsetHeight || 29) / 2) + "px";
-  } else scaleY = stageH - 22;
+  } else scaleY = tb !== null ? tb - 10 : stageH - 22;
+  document.getElementById("hint").style.bottom = Math.round(stageH - scaleY + 28) + "px";
 }
 function resize() {
   const r = stage.getBoundingClientRect();
@@ -1102,6 +1135,7 @@ const showDate = d => {
   dateLabels.forEach(l => { l.textContent = t; });
 };
 function useDate(d) {
+  timeStop(false);                    // picking a date stops time travel; the planets glide to the date
   setMapDate(d, true); showDate(d);
   dateInputs.forEach(i => { if (i !== document.activeElement) i.value = ymd(d); });
   selSeg = -1; selOrbit = -1; for (const k in cache) delete cache[k];
@@ -1137,6 +1171,109 @@ dateInputs.forEach(input => {
     applyDate(d, input);
   });
 });
+// ---------- Time travel (Orbits) ----------
+// Play moves the planets smoothly through time, forward or backward, at a chosen speed: how much time passes each
+// second. Starting eases up to speed over 1 s, pausing eases down over 1 s, changing speed glides over 0.5 s, and
+// reversing direction slows through stopped and speeds up the other way. The date in the panel (and the full-screen
+// chip) updates once a second while moving, and when it stops. Pinching, dragging and taps keep working throughout.
+// Planets that would go around more than about once a second (Mercury first) fade into a glowing ring along their
+// orbit, since at 60 frames a second they would only flicker; they come back as it slows.
+const TT_SPEEDS = [
+  { days: 1, label: "1 day" }, { days: 7, label: "1 week" }, { days: 30.436875, label: "1 month" },
+  { days: 365.2425, label: "1 year" }, { days: 3652.425, label: "10 years" }, { days: 36524.25, label: "100 years" },
+];
+// how far it goes: January 1 of the year 1 to December 31, 3000 (the date field can't show years before 1; the
+// orbit formulas are only approximate far from today anyway)
+const TT_MIN = (() => { const d = new Date(2000, 0, 1, 12); d.setFullYear(1); return d.getTime(); })();
+const TT_MAX = new Date(3000, 11, 31, 12).getTime();
+let ttSpeed = 2;               // index into TT_SPEEDS (1 month a second)
+try { const v = +localStorage.getItem("ttSpeed"); if (v >= 0 && v < TT_SPEEDS.length && localStorage.getItem("ttSpeed") !== null) ttSpeed = v; } catch (e) {}
+let ttDir = 0;                 // where it's headed: 1 forward, -1 backward, 0 paused
+let ttV = 0;                   // current speed, in days per second (negative going back)
+let ttRamp = null;             // { from, to, dur, t0 } while easing between speeds
+let ttLast = null, ttTick = 0; // previous frame time; seconds since the date was last shown
+const ttBtn = id => document.getElementById(id);
+const ttSel = ttBtn("ttSpeed");
+TT_SPEEDS.forEach((sp, i) => { const op = document.createElement("option"); op.value = i; op.textContent = sp.label + " per second"; ttSel.appendChild(op); });
+function ttTarget() { return ttDir * TT_SPEEDS[ttSpeed].days; }
+function ttRampTo(dur) {
+  const to = ttTarget();
+  if (reduceMotion) { ttV = to; ttRamp = null; return; }
+  ttRamp = { from: ttV, to, dur, t0: null };   // the clock starts on the next frame drawn
+}
+function ttShowDate() {
+  showDate(mapDay);
+  dateInputs.forEach(i => { if (i !== document.activeElement) i.value = ymd(mapDay); });
+}
+function ttUpdateButtons() {
+  ttBtn("ttFwd").setAttribute("aria-pressed", ttDir > 0);
+  ttBtn("ttBack").setAttribute("aria-pressed", ttDir < 0);
+  ttBtn("ttPause").disabled = ttDir === 0;
+  ttBtn("ttSlower").disabled = ttSpeed === 0;
+  ttBtn("ttFaster").disabled = ttSpeed === TT_SPEEDS.length - 1;
+  ttBtn("ttSpeedLabel").textContent = TT_SPEEDS[ttSpeed].label + " / sec";
+  ttSel.value = ttSpeed;
+}
+function timePlay(dir) {
+  if (ttDir === dir) return;
+  const reversing = ttDir !== 0 || Math.abs(ttV) > 1e-9;
+  ttDir = dir; mapAnim = null; ttTick = 0;
+  ttRampTo(reversing && Math.sign(ttV) === -dir ? 2000 : 1000);   // reversing: 1 s down, 1 s back up
+  ttUpdateButtons();
+}
+function timePause() { if (ttDir === 0) return; ttDir = 0; ttRampTo(1000); ttUpdateButtons(); }
+// stop at once (leaving Orbits, picking a date): no slowing down
+function timeStop(now) {
+  if (ttDir === 0 && !ttRamp && ttV === 0) return;
+  ttDir = 0; ttV = 0; ttRamp = null; ttTick = 0;
+  if (now) ttShowDate();
+  ttUpdateButtons();
+}
+function timeSpeed(i) {
+  i = Math.max(0, Math.min(TT_SPEEDS.length - 1, i));
+  if (i === ttSpeed) return;
+  ttSpeed = i;
+  try { localStorage.setItem("ttSpeed", i); } catch (e) {}
+  if (ttDir !== 0) ttRampTo(500);
+  ttUpdateButtons();
+}
+// how far through fading into its ring a planet is at the current speed: 0 below half a lap a second, 1 from one lap
+function ttFade(o) {
+  const el = ORBIT[o.id]; if (!el || !ttV) return 0;
+  const laps = Math.abs(ttV) / (360 / el[1] * 36525);
+  return Math.min(1, Math.max(0, (laps - 0.5) / 0.5));
+}
+function stepTime(now) {
+  const dt = ttLast === null ? 0 : Math.min(0.1, (now - ttLast) / 1000);
+  ttLast = now;
+  if (ttRamp) {
+    if (ttRamp.t0 === null) ttRamp.t0 = now;
+    const t = Math.min(1, (now - ttRamp.t0) / ttRamp.dur);
+    ttV = ttRamp.from + (ttRamp.to - ttRamp.from) * ease(t);
+    if (t >= 1) ttRamp = null;
+  }
+  if (ttV === 0) return;
+  let ms = mapDay.getTime() + ttV * dt * 86400000;
+  const edge = ms <= TT_MIN || ms >= TT_MAX;
+  ms = Math.min(TT_MAX, Math.max(TT_MIN, ms));
+  mapDay = new Date(ms);
+  ALL_LIST.forEach(o => { mapLong[o.id] = longitudeOn(o.id, mapDay); });
+  belt.from = belt.to = beltDaysOf(mapDay); belt.e = 1;
+  ttTick += dt;
+  if (edge) { timeStop(true); return; }                        // the first or last date it goes to
+  if (!ttRamp && ttDir === 0) { ttV = 0; ttShowDate(); return; }   // just finished slowing to a stop
+  if (ttTick >= 1) { ttTick -= 1; ttShowDate(); }                  // once a second while moving
+}
+ttBtn("ttFwd").addEventListener("click", () => timePlay(1));
+ttBtn("ttBack").addEventListener("click", () => timePlay(-1));
+ttBtn("ttPause").addEventListener("click", timePause);
+ttBtn("ttSlower").addEventListener("click", () => timeSpeed(ttSpeed - 1));
+ttBtn("ttFaster").addEventListener("click", () => timeSpeed(ttSpeed + 1));
+ttSel.addEventListener("change", () => timeSpeed(+ttSel.value));
+// taps on the controls belong to them, not to the viewer underneath
+ttBtn("timebar").addEventListener("pointerdown", e => e.stopPropagation());
+ttUpdateButtons();
+
 const showInner = () => { allHintStep = Math.max(allHintStep, 1); frameRange(0, auOf("mars")); };
 const showOuter = () => { allHintStep = Math.max(allHintStep, 1); frameRange(auOf("jupiter"), auOf("pluto")); };
 ["btnInner", "tInner"].forEach(id => document.getElementById(id).addEventListener("click", showInner));
@@ -1439,7 +1576,10 @@ function selectObject(o) {
   if (s0) crossFade(document.querySelector(".hud"));
   if (panelToo) crossFade(panel);
   glide = null; morph = null;
-  obj = o; selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true; measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
+  obj = o; selSeg = -1; selBody = -1; selOrbit = -1; segPop.hidden = true;
+  app.classList.toggle("mapview", !!o.map);   // before measuring: in Orbits the time controls take room at the bottom
+  if (!o.map) timeStop(true);                 // leaving Orbits pauses time travel
+  measureTheater(); zoom = 1; anim = null; cx = view().x; cy = homeY(); hintDismissed = false;
   document.querySelectorAll(".chip, .tchip").forEach(c => c.setAttribute("aria-pressed", c.dataset.id === o.id));
   closeDrop();
   const tc = document.getElementById("tchip-" + o.id);
@@ -1499,7 +1639,12 @@ function refreshAbout(o) {
       "object's average distance from the Sun, so orbit sizes are to scale, and each object sits where it is along its orbit on that " +
       "date, worked out from published orbital elements (Ceres's position is approximate). Objects are drawn the same size, so sizes " +
       "are not to scale. The dashed line straight up from the Sun crosses every orbit; tap a piece of it to see the distance between " +
-      "those two orbits and the Starship travel time, or tap an orbit itself to see its distance and travel time from the Sun.") :
+      "those two orbits and the Starship travel time, or tap an orbit itself to see its distance and travel time from the Sun.") +
+     sec("Time travel", "Use the controls at the bottom of the view to move through time: \u25B6 plays forward, \u25C0 plays " +
+      "backward, and \u275A\u275A pauses. The speed is how much time passes each second, from a day to a hundred years; change it " +
+      "with \u2212 and +, or tap it to pick one. The date updates once a second while moving. An object that would go around " +
+      "the Sun more than about once a second turns into a glowing ring along its orbit until it slows down. Time travel " +
+      "goes from the year 1 to the year 3000; positions far from today are only approximate.") :
      o.all ? sec("Distances view", "Every object is drawn the same size, so sizes here are not to scale. Their distances are: each sits at its " +
       "average distance from the Sun along one line, so the inner planets crowd together near the Sun. Pinch to spread them out. " +
       "Tap the line between two neighbors to see the distance and Starship travel time between them.") : "") +
@@ -1737,11 +1882,18 @@ const BELT_ROCKS = (() => {
   return out;
 })();
 function drawBelt(perAU, on, ox = cx, oy = cy) {   // ox, oy: the Sun on screen
+  const TAU = 2 * Math.PI;
   // draw more rocks the bigger the ring is on screen, so it looks equally dense at any zoom
   const n = Math.min(BELT_ROCKS.length, Math.max(120, Math.round(2 * Math.PI * 2.7 * perAU * 0.9)));
   for (let i = 0; i < n; i++) {
     const k = BELT_ROCKS[i];
-    const d = k.au * perAU, x = ox + Math.cos(k.a) * d, y = oy - Math.sin(k.a) * d;
+    // each rock goes around the Sun at its own pace (a lap takes au^1.5 years), from where it is today. While the
+    // date glides, each takes the short trip to its new spot, like the planets (not every lap in between).
+    const w = TAU / (365.2425 * k.au * Math.sqrt(k.au));
+    let dd = ((w * (belt.to - belt.from)) % TAU + TAU) % TAU;
+    if (!belt.fwd && dd > 1e-9) dd -= TAU;
+    const a = k.a + w * belt.from + dd * belt.e;
+    const d = k.au * perAU, x = ox + Math.cos(a) * d, y = oy - Math.sin(a) * d;
     if (x < -4 || x > stageW + 4 || y < -4 || y > stageH + 4) continue;
     const c = k.shade;
     // warm brownish gray, so the rocks read as rocks and not as the white and bluish background stars
@@ -1758,11 +1910,18 @@ function drawAllOverlay() {
       const r = p.o.au * perAU;
       if (!r) return;
       const on = i === selOrbit;               // the tapped orbit is drawn in amber
+      const fast = ttFade(p.o);
+      if (fast > 0) {                          // time travel: too fast to follow, so a glowing ring in its color
+        ctx.strokeStyle = p.o.swatch || "#a08c6a";
+        ctx.globalAlpha = 0.22 * fast; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 0.75 * fast; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       if (p.o.group) {
         // the asteroid belt is a plain orbit line when zoomed out, and becomes a ring of little rocks once the view
         // reaches only 3x the belt's distance from the Sun (a short fade in between avoids a sudden pop)
         const visAU = view().fit / 2 / perAU, rocks = Math.min(1, Math.max(0, (3.5 * p.o.au - visAU) / (0.5 * p.o.au)));
-        if (rocks > 0) { ctx.globalAlpha = rocks; drawBelt(perAU, on); ctx.globalAlpha = 1; }
+        if (rocks > 0 && fast < 1) { ctx.globalAlpha = rocks * (1 - fast); drawBelt(perAU, on); ctx.globalAlpha = 1; }
         if (rocks >= 1) return;
         ctx.globalAlpha = 1 - rocks;
       }
@@ -1789,8 +1948,11 @@ function drawAllOverlay() {
     if (p.x < -40 || p.x > stageW + 40 || p.y < -20) continue;
     if (p.y + ICON_R + 13 > (scaleY || stageH - 22) - 20) continue;   // no names over the scale bar or buttons
     if (drawn.some(q => Math.hypot(p.x - q[0], p.y - q[1]) < 40)) continue;
+    if (p.a !== undefined && p.a < 0.05) continue;   // a planet faded into its ring has no name tag
     const name = p.o.short || p.o.name, hw = ctx.measureText(name).width / 2 + 4;
+    if (p.a !== undefined) ctx.globalAlpha = p.a;
     ctx.fillText(name, Math.min(Math.max(p.x, hw), stageW - hw), p.y + ICON_R + 13);   // keep names on screen
+    ctx.globalAlpha = 1;
     drawn.push([p.x, p.y]);
   }
   // popup for the tapped object or line
@@ -1839,6 +2001,7 @@ const t0 = performance.now();
 // draws one frame; also called straight after the viewer is resized, since resizing a canvas clears it and the
 // screen would otherwise show it blank until the next frame (a brief flash with nothing on it)
 function render(now, live) {
+  stepTime(now);
   stepMapAnim(now);
   if (glide) stepGlide(now, live);
   if (morph) stepMorph(now, live);
@@ -1858,6 +2021,7 @@ function render(now, live) {
   for (const p of placements()) {
     const b = p.b, tx = tex[b.texName];
     if (!tx || (b.ring && !ringTex)) continue;
+    if (p.a !== undefined && p.a < 0.01) continue;   // faded out completely (a fast planet during time travel)
     const R = p.R * dpr;                           // equatorial radius in device pixels
     // Rule: a body narrower than one screen pixel lights nothing. Below that the screen stays black.
     // (The All view draws every object at a fixed icon size, so the rule doesn't apply there.)
@@ -1880,6 +2044,7 @@ function render(now, live) {
     gl.uniform3fv(U.uTint, b.tint);
     gl.uniform1f(U.uHasRing, b.ring ? 1 : 0);
     gl.uniform1f(U.uSun, b.sun ? 1 : 0);
+    gl.uniform1f(U.uAlpha, p.a === undefined ? 1 : p.a);
     gl.uniform1f(U.uLimb, b.limb); gl.uniform1f(U.uAtmo, b.atmo); gl.uniform3fv(U.uAtmoCol, b.atmoCol);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
