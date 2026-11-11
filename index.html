@@ -106,6 +106,9 @@ i.belt svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
 .panel { position: relative; box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); padding-block: 12px 12px; display: grid; gap: 10px; align-content: start; }
 .ghost { pointer-events: none; }
+#diag { position: fixed; left: 8px; right: 8px; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 20;
+  background: rgba(0,0,0,.88); color: #cfe3ff; border: 1px solid #3a4a66; border-radius: 10px; padding: 10px 12px;
+  font: 11px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; max-height: 70vh; overflow-y: auto; }
 .namerow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .pname { font-family: var(--font-display); font-weight: 500; font-size: 18px; line-height: 1.2; margin: 0; text-wrap: balance; white-space: nowrap; }
 .like { flex: 1 1 auto; color: var(--muted); font-size: 13px; line-height: 1.35; text-align: right; min-width: 0; text-wrap: balance; }
@@ -232,17 +235,21 @@ i.allic svg { width: 100%; height: 100%; display: block; overflow: visible; }
 (() => {
   if (!window.navigator.standalone) return;
   const root = document.documentElement;
-  function fit() {
+  // each run is noted for the hidden diagnostic readout (tap the title three times)
+  const log = window.__fitLog = [];
+  function fit(why) {
     root.style.height = "";
-    const inset = parseFloat(getComputedStyle(root).paddingTop) || 0;
+    const inset = parseFloat(getComputedStyle(root).paddingTop) || 0, ch = root.clientHeight;
+    const note = { t: Math.round(performance.now()), why, inset, ch, ih: innerHeight, set: "" };
+    if (log.push(note) > 12) log.shift();
     if (inset <= 0) return;                                   // status bar not overlapping: normal sizing is right
     const land = matchMedia("(orientation: landscape)").matches;
     const h = land ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
-    if (h > root.clientHeight) { root.style.height = h + "px"; root.style.overflow = "hidden"; }
+    if (h > ch) { root.style.height = h + "px"; root.style.overflow = "hidden"; note.set = h; }
   }
-  fit();
-  addEventListener("resize", fit);
-  addEventListener("orientationchange", () => setTimeout(fit, 300));
+  fit("start");
+  addEventListener("resize", () => fit("resize"));
+  addEventListener("orientationchange", () => setTimeout(() => fit("rotate"), 300));
 })();
 </script>
 <div class="app">
@@ -2077,6 +2084,55 @@ requestAnimationFrame(frame);
   setTimeout(check, 1500);
   document.addEventListener("visibilitychange", check);
   window.addEventListener("pageshow", e => { if (e.persisted) check(); });
+})();
+
+// ---------- Hidden diagnostic readout ----------
+// Tap the title ("Solar System Model") three times quickly to show or hide a box of screen measurements, used to
+// track down the black band that sometimes appears at the bottom of the Home Screen app. Tap the box to hide it.
+(() => {
+  const title = document.querySelector("h1"), loadedAt = new Date();
+  let taps = [], box = null, timer = 0;
+  const probe = document.createElement("div");   // reads the safe-area insets iOS reports right now
+  probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
+  document.body.appendChild(probe);
+  const r = n => Math.round(n * 10) / 10;
+  function text() {
+    const root = document.documentElement, cs = getComputedStyle(probe), vv = window.visualViewport;
+    const app = document.querySelector(".app").getBoundingClientRect();
+    const land = matchMedia("(orientation: landscape)").matches;
+    const screenH = land ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    const lines = [
+      "SPACE DAY DIAGNOSTICS  (tap to close)",
+      "home screen app: " + (navigator.standalone ? "yes" : "no") + "   display-mode standalone: " + matchMedia("(display-mode: standalone)").matches,
+      "orientation: " + (land ? "landscape" : "portrait") + "   pixel ratio: " + devicePixelRatio,
+      "screen: " + screen.width + " x " + screen.height,
+      "window inner: " + innerWidth + " x " + innerHeight + "   outer: " + outerWidth + " x " + outerHeight,
+      "visual viewport: " + (vv ? r(vv.width) + " x " + r(vv.height) + "  top " + r(vv.offsetTop) : "n/a"),
+      "page (html) height: " + root.clientHeight + "   forced height: " + (root.style.height || "none"),
+      "safe areas  top " + cs.paddingTop + "  bottom " + cs.paddingBottom + "  left " + cs.paddingLeft + "  right " + cs.paddingRight,
+      "app box: top " + r(app.top) + "  bottom " + r(app.bottom) + "  height " + r(app.height),
+      "gap below app (screen - app bottom): " + r(screenH - app.bottom),
+      "loaded " + loadedAt.toLocaleTimeString() + ", " + Math.round(performance.now() / 1000) + " s ago",
+      "",
+      "sizing runs (ms after load, why, top inset, page h, window h, forced to):",
+      ...(window.__fitLog || ["none (not a Home Screen app)"]).map(n => typeof n === "string" ? "  " + n
+        : "  " + n.t + "  " + n.why + "  " + n.inset + "  " + n.ch + "  " + n.ih + "  " + (n.set || "-")),
+    ];
+    return lines.join("\n");
+  }
+  function show() {
+    box = document.createElement("div"); box.id = "diag";
+    box.addEventListener("click", hide);
+    document.body.appendChild(box);
+    const tick = () => { box.textContent = text(); };
+    tick(); timer = setInterval(tick, 500);
+  }
+  function hide() { clearInterval(timer); if (box) box.remove(); box = null; }
+  title.addEventListener("click", () => {
+    const now = performance.now();
+    taps = taps.filter(t => now - t < 700); taps.push(now);
+    if (taps.length >= 3) { taps = []; box ? hide() : show(); }
+  });
 })();
 </script>
 
