@@ -1180,14 +1180,18 @@ dateInputs.forEach(input => {
 // orbit, since at 60 frames a second they would only flicker; they come back as it slows.
 const TT_SPEEDS = [
   { days: 1, label: "1 day" }, { days: 7, label: "1 week" }, { days: 30.436875, label: "1 month" },
-  { days: 365.2425, label: "1 year" }, { days: 3652.425, label: "10 years" }, { days: 36524.25, label: "100 years" },
+  { days: 182.62125, label: "6 months" }, { days: 365.2425, label: "1 year" }, { days: 3652.425, label: "10 years" },
+  { days: 18262.125, label: "50 years" }, { days: 36524.25, label: "100 years" },
 ];
 // how far it goes: January 1 of the year 1 to December 31, 3000 (the date field can't show years before 1; the
 // orbit formulas are only approximate far from today anyway)
 const TT_MIN = (() => { const d = new Date(2000, 0, 1, 12); d.setFullYear(1); return d.getTime(); })();
 const TT_MAX = new Date(3000, 11, 31, 12).getTime();
 let ttSpeed = 2;               // index into TT_SPEEDS (1 month a second)
-try { const v = +localStorage.getItem("ttSpeed"); if (v >= 0 && v < TT_SPEEDS.length && localStorage.getItem("ttSpeed") !== null) ttSpeed = v; } catch (e) {}
+try {                          // the last speed used, saved by name so a changed list of speeds doesn't shift it
+  const i = TT_SPEEDS.findIndex(sp => sp.label === localStorage.getItem("ttSpeedName"));
+  if (i >= 0) ttSpeed = i;
+} catch (e) {}
 let ttDir = 0;                 // where it's headed: 1 forward, -1 backward, 0 paused
 let ttV = 0;                   // current speed, in days per second (negative going back)
 let ttRamp = null;             // { from, to, dur, t0 } while easing between speeds
@@ -1233,7 +1237,7 @@ function timeSpeed(i) {
   i = Math.max(0, Math.min(TT_SPEEDS.length - 1, i));
   if (i === ttSpeed) return;
   ttSpeed = i;
-  try { localStorage.setItem("ttSpeed", i); } catch (e) {}
+  try { localStorage.setItem("ttSpeedName", TT_SPEEDS[i].label); } catch (e) {}
   if (ttDir !== 0) ttRampTo(500);
   ttUpdateButtons();
 }
